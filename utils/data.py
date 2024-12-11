@@ -109,8 +109,9 @@ class iCIFAR224(iData):
     class_order = np.arange(100).tolist()
 
     def download_data(self):
-        train_dataset = datasets.cifar.CIFAR100("/data/sunhl/data", train=True, download=True)
-        test_dataset = datasets.cifar.CIFAR100("/data/sunhl/data", train=False, download=True)
+        self.root_dir = "/home/qc/dataset"
+        train_dataset = datasets.cifar.CIFAR100(root=self.root_dir, train=True, download=True)
+        test_dataset = datasets.cifar.CIFAR100(root=self.root_dir, train=False, download=True)
         self.train_data, self.train_targets = train_dataset.data, np.array(
             train_dataset.targets
         )

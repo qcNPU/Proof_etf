@@ -7,6 +7,7 @@ import timm
 import torch.nn.functional as F
 from convs.projections import Proj_Pure_MLP, MultiHeadAttention
 from utils.toolkit import get_attribute
+from models.ETFHead import ETFHead
 
 def get_convnet(args, pretrained=False):
 
@@ -17,7 +18,7 @@ def get_convnet(args, pretrained=False):
         import open_clip
         if backbone_name == 'clip':
             model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', pretrained='laion400m_e32')
-            tokenizer = open_clip.get_tokenizer('ViT-B-16')
+            tokenizer = open_clip.tokenize
             model.out_dim = 512
             return model, preprocess, tokenizer
         elif backbone_name=='clip_laion2b':
@@ -380,6 +381,7 @@ class Proof_Net(SimpleClipNet):
         
         self.sel_attn = MultiHeadAttention(1, self.feature_dim, self.feature_dim, self.feature_dim, dropout=0.1)
         self.img_prototypes = None
+        self.eft_head = ETFHead(100, self.feature_dim)
 
         self.context_prompts = nn.ParameterList()
 
@@ -473,8 +475,8 @@ class Proof_Net(SimpleClipNet):
         prototype_features = prototype_features.view(prototype_features.shape[0], -1)
         return image_features, text_features, self.convnet.logit_scale.exp(), prototype_features
     
-    def forward_transformer(self, image_features, text_features, transformer=False):
-        prototype_features = self.encode_prototpyes(normalize=True)
+    def forward_transformer(self, image_features, text_features, transformer=True,prototype_features=None):
+        prototype_features = self.encode_prototpyes(normalize=True) if prototype_features is None else prototype_features
         if transformer:
             context_prompts = self.get_context_prompts()
             len_texts = text_features.shape[0]

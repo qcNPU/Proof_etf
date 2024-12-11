@@ -49,7 +49,7 @@ class Learner(BaseLearner):
                 (_,data,label)=batch
                 data=data.to(self._device)
                 label=label.to(self._device)
-                embedding=model.convnet.encode_image(data, True)
+                embedding=model.convnet.encode_image(data)
                 embedding_list.append(embedding.cpu())
                 label_list.append(label.cpu())
         embedding_list = torch.cat(embedding_list, dim=0)
@@ -118,7 +118,8 @@ class Learner(BaseLearner):
         templates = self.data_manager._data_to_prompt[0]
         prog_bar = tqdm(range(self.tuned_epoch))
         cliploss = ClipLoss()
-
+        total_class = self.data_manager._class_order[:self._total_classes]
+        total_target = torch.tensor(total_class, dtype=torch.int64).to(self._device)
         total_labels = class_to_label[:self._total_classes] # mask all known classes
         for _, epoch in enumerate(prog_bar):
             self._network.train()
@@ -136,6 +137,9 @@ class Learner(BaseLearner):
                 image_features = self._network.encode_image(inputs)
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
                 image_features, text_features, logit_scale, proto_feas=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
+                # 把 Prototype 和 text feature 都往 ETF 上去拉
+                loss_etf1 = self._network.eft_head.forward_train(text_features, total_target)["loss"]
+                loss_etf = loss_etf1
                 logits = image_features@text_features.T # [bs, allclasses]
 
                 texts=[templates.format(inst) for inst in labels]
@@ -149,7 +153,7 @@ class Learner(BaseLearner):
 
                 protoloss = F.cross_entropy(image_features @ proto_feas.T, targets)
 
-                total_loss = loss+clip_loss+protoloss
+                total_loss = loss+clip_loss+protoloss + loss_etf
 
                 optimizer.zero_grad()
                 total_loss.backward()
