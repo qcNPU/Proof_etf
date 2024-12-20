@@ -1,16 +1,18 @@
-import math
-from typing import Dict, List
+from copy import deepcopy
+from typing import Dict
 
+import math
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.distributed as dist
-
+import torch.nn as nn
 from mmcv.runner import get_dist_info
+from scipy.optimize import linear_sum_assignment
+from sklearn.metrics.pairwise import cosine_similarity
+
 from utils.logger import get_root_logger
-
+from utils.toolkit import normalize
 from .cls_head import ClsHead
-
 
 
 def generate_random_orthogonal_matrix(feat_in, num_classes):
@@ -93,19 +95,23 @@ class ETFHead(ClsHead):
         one_nc_nc: torch.Tensor = torch.mul(torch.ones(self.num_classes, self.num_classes), (1 / self.num_classes))
         etf_vec = torch.mul(torch.matmul(orth_vec, i_nc_nc - one_nc_nc),
                             math.sqrt(self.num_classes / (self.num_classes - 1)))
-        self.register_buffer('etf_vec', etf_vec)
-
+        self.register_buffer('etf_vec', etf_vec.T)
+        self.register_buffer('etf_vec_copy', deepcopy(etf_vec))
+        self.assignInfo = {}
+        self.assignIndex = {}
+        self.reserve_vector_count = 100  # modify this with class_nums
         etf_rect = torch.ones((1, num_classes), dtype=torch.float32)
         self.etf_rect = etf_rect
 
-    def pre_logits(self, x):
+    def norm(self, x):
         x = x / torch.norm(x, p=2, dim=1, keepdim=True)
         return x
 
     def forward_train(self, x: torch.Tensor, gt_label: torch.Tensor, **kwargs) -> Dict:
         """Forward training data."""
-        x = self.pre_logits(x)
-        target = self.etf_vec[:, gt_label].t()  # 直接把图片特征往设定好的 ETF 向量上 pull
+        x = self.norm(x)
+        # target = self.etf_vec[:, gt_label].t()  # 直接把图片特征往设定好的 ETF 向量上 pull
+        target = self.assign_target(x,gt_label)
         losses = self.loss(x, target)
         if self.cal_acc:
             with torch.no_grad():
@@ -118,11 +124,42 @@ class ETFHead(ClsHead):
                 }
         return losses
 
-    def get_eft_logits(self,x,num_cls):
-        x = self.pre_logits(x)
-        cls_score = (x @ self.etf_vec)[:, :num_cls]
-        return cls_score
+    def assign_target(self, source, source_labels):
+        # new_lb = [i for i in source_labels if self.assignInfo.get(i.item()) is None]
+        new_lb = list({i.item() for i in source_labels if self.assignInfo.get(i.item()) is None})
 
+        if len(new_lb) > 0:
+            # Normalise incoming prototypes
+            base_prototypes = normalize(source[-len(new_lb):,:])
+            # 根据与class prototype 的相似度从初始化向量池中选择最相似的
+            cost = cosine_similarity(base_prototypes.detach().cpu(), self.etf_vec.cpu())
+            cost = 1-cost
+            col_ind = self.get_assignment(cost)
+            # labels 只用来记录哪个类别选了哪个向量
+            for i, label in enumerate(new_lb):
+                self.assignInfo[label] = self.etf_vec[col_ind[i]].view(-1, self.in_channels)  # 把 value 直接变成向量
+                self.assignIndex[label] = col_ind[i] #先存着后面用
+
+            # Remove from the final rv ，将已分配的向量从池子中去掉
+            all_idx = np.arange(self.etf_vec.shape[0])
+            etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
+            del self.etf_vec
+            self.register_buffer('etf_vec', etf_vec)
+        # 将类别对应的 target 向量返回
+        assign_target = torch.cat([self.assignInfo[label.item()] for label in source_labels], dim=0)
+        return assign_target
+
+
+    def get_assignment(self, cost):
+        """Tak array with cosine scores and return the output col ind """
+        _, col_ind = linear_sum_assignment(cost, maximize=True)
+        return col_ind
+
+    def get_eft_logits(self, x, total_class):
+        x = self.norm(x)
+        assign_target = self.assign_target(x, total_class)
+        cls_score = (x @ assign_target.T)  # text feature 和 etf 对齐之后，etf 就不在分类中起作用了，不然没法 test
+        return cls_score
 
     def loss(self, feat, target, **kwargs):
         losses = dict()
@@ -132,7 +169,7 @@ class ETFHead(ClsHead):
         return losses
 
     def simple_test(self, x, softmax=False, post_process=False):
-        x = self.pre_logits(x)
+        x = self.norm(x)
         cls_score = x @ self.etf_vec
         cls_score = cls_score[:, :self.eval_classes]
         assert not softmax

@@ -9,11 +9,13 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from utils.inc_net import  Proof_Net
 from models.base import BaseLearner
-from utils.toolkit import tensor2numpy, get_attribute, ClipLoss
+from utils.toolkit import tensor2numpy, get_attribute, ClipLoss,normalize
 from utils.data_manager import LaionData
 import math
 import matplotlib.pyplot as plt
 import os
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy.optimize import linear_sum_assignment
 
 
 num_workers = 8
@@ -24,22 +26,23 @@ class Learner(BaseLearner):
 
         self._train_transformer=False
         self._network = Proof_Net(args, False)
-        
+
         self.batch_size = get_attribute(args,"batch_size", 48)
         self.init_lr = get_attribute(args, "init_lr", 0.01)
         self.weight_decay = get_attribute(args, "weight_decay", 0.0005)
         self.min_lr = get_attribute(args, "min_lr", 1e-8)
         self.frozen_layers = get_attribute(args, "frozen_layers", None)
-        
+
         self.tuned_epoch = get_attribute(args, "tuned_epoch", 5)
-        
+
         self._known_classes = 0
+
         self.use_cos = get_attribute(args, "use_cos", False)
 
     def after_task(self):
         self._known_classes = self._total_classes
-        logging.info("Exemplar size: {}".format(self.exemplar_size))
-    
+        print("Exemplar size: {}".format(self.exemplar_size))
+
     def cal_prototype(self,trainloader, model):
         model = model.eval()
         embedding_list = []
@@ -65,19 +68,19 @@ class Learner(BaseLearner):
     def incremental_train(self, data_manager):
         self._cur_task += 1
         self._total_classes = self._known_classes + data_manager.get_task_size(self._cur_task)
-        
+
         self._network.update_prototype(self._total_classes)
         self._network.update_context_prompt() # add context prompts
 
         self._network.extend_task()
-        
-        logging.info("Learning on {}-{}".format(self._known_classes, self._total_classes))
+
+        print("Learning on {}-{}".format(self._known_classes, self._total_classes))
         train_dataset = data_manager.get_dataset(np.arange(self._known_classes, self._total_classes),
             source="train", mode="train", appendent=self._get_memory())
         self.train_dataset=train_dataset
         self.data_manager=data_manager
         self._network.to(self._device)
-       
+
         self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=num_workers)
         test_dataset = data_manager.get_dataset(np.arange(0, self._total_classes), source="test", mode="test" )
         self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=num_workers)
@@ -97,62 +100,69 @@ class Learner(BaseLearner):
         self.build_rehearsal_memory(data_manager, self.samples_per_class)
         if len(self._multiple_gpus) > 1:
             self._network = self._network.module
-    
+
     def _train_proj(self, train_loader, test_loader, train_loader_for_protonet):
         self._train_transformer=True
         self._network.to(self._device)
-       
+
         for name, param in self._network.convnet.named_parameters():
             if 'logit_scale' not in name:
                 param.requires_grad = False
         self._network.freeze_projection_weight_new()
-        
+
         if self.args['optimizer']=='sgd':
             optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=self.init_lr,weight_decay=self.weight_decay)
-        elif self.args['optimizer']=='adam': 
+        elif self.args['optimizer']=='adam':
             optimizer = optim.AdamW(self._network.parameters(), lr=self.init_lr, weight_decay=self.weight_decay)
-        
+
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args['tuned_epoch'], eta_min=self.min_lr)
 
         class_to_label = self.data_manager._class_to_label
         templates = self.data_manager._data_to_prompt[0]
         prog_bar = tqdm(range(self.tuned_epoch))
         cliploss = ClipLoss()
+        total_cls_names = class_to_label[:self._total_classes] # mask all known classes
         total_class = self.data_manager._class_order[:self._total_classes]
         total_target = torch.tensor(total_class, dtype=torch.int64).to(self._device)
-        total_labels = class_to_label[:self._total_classes] # mask all known classes
+        self.total_class = total_target
         for _, epoch in enumerate(prog_bar):
             self._network.train()
             losses = 0.0
             correct, total = 0, 0
             for i, (_, inputs, targets) in enumerate(train_loader):
-                labels = [class_to_label[y] for y in targets]
+                cls_names = [class_to_label[y] for y in targets]  #把 target 数字变成 class name
+
                 inputs = inputs.to(self._device)
                 targets = targets.to(self._device)
-                
-                texts = [templates.format(inst) for inst in total_labels]
+
+                texts = [templates.format(inst) for inst in total_cls_names]
                 texts = self._network.tokenizer(texts).to(self._device)
                 text_features = self._network.encode_text(texts) # [total_classes, dim]
                 text_feas = text_features / text_features.norm(dim=-1, keepdim=True)
                 image_features = self._network.encode_image(inputs)
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
                 image_features, text_features, logit_scale, proto_feas=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
-                # 把 Prototype 和 text feature 都往 ETF 上去拉
-                loss_etf1 = self._network.eft_head.forward_train(text_features, total_target)["loss"]
-                loss_etf = loss_etf1
+                # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
+                loss_etf1 = self._network.eft_head.forward_train(text_features, total_target)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                loss_etf2 = self._network.eft_head.forward_train(image_features, targets)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                # loss_etf3 = self._network.eft_head.forward_train(proto_feas, total_target)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                loss_etf = 3*(loss_etf1+loss_etf2)
+                # loss_etf = 3 * loss_etf1
                 logits = image_features@text_features.T # [bs, allclasses]
+                # etf_outputs = self._network.eft_head.get_eft_logits(image_features, self.total_class)
+                # logits = logits + 100*etf_outputs
 
-                texts=[templates.format(inst) for inst in labels]
+                texts=[templates.format(inst) for inst in cls_names]
                 clip_text_feas=self._network.encode_text(self._network.tokenizer(texts).to(self._device))#total,dim
-                clip_text_norm=clip_text_feas.norm(dim=-1, keepdim=True)
-                clip_text_feas = clip_text_feas / clip_text_norm
+                clip_text_feas = clip_text_feas / clip_text_feas.norm(dim=-1, keepdim=True)
 
-                clip_loss = cliploss(img_feas, clip_text_feas, logit_scale)
+                clip_loss = cliploss(img_feas, clip_text_feas, logit_scale)  # 这个loss有效
 
                 loss = F.cross_entropy(logits, targets)
 
                 protoloss = F.cross_entropy(image_features @ proto_feas.T, targets)
 
+                print(f"Loss:  text match :{loss},clipCE:{clip_loss},visual match:{protoloss},etf_loss:{loss_etf}")
                 total_loss = loss+clip_loss+protoloss + loss_etf
 
                 optimizer.zero_grad()
@@ -169,10 +179,13 @@ class Learner(BaseLearner):
             test_acc = self._compute_accuracy(self._network, test_loader)
             info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_acc {:.2f}, Test_acc {:.2f}".format(
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
-            prog_bar.set_description(info)
+            # prog_bar.set_description(info)
+            print(info)
 
 
-    def _compute_accuracy(self, model, loader):
+
+
+    def _compute_accuracy(self, model, loader):# 只计算 top1
         self._network.eval()
         class_to_label = self.data_manager._class_to_label
         templates = self.data_manager._data_to_prompt
@@ -188,7 +201,7 @@ class Learner(BaseLearner):
                 class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
                 text_features.append(class_embeddings)
             text_features = torch.stack(text_features, dim=0)
-        
+
         correct, total = 0, 0
         for i, (_, inputs, targets) in enumerate(loader):
             inputs = inputs.to(self._device)
@@ -198,6 +211,8 @@ class Learner(BaseLearner):
                 outputs = transf_image_features @ transf_text_features.T
                 proto_outputs= transf_image_features @ proto_feas.T
                 original_outputs= image_features @ text_features.T
+                # etf_outputs = self._network.eft_head.get_eft_logits(transf_image_features,self.total_class)
+                # outputs = original_outputs+outputs+proto_outputs + 100*etf_outputs
                 outputs = original_outputs+outputs+proto_outputs
 
             predicts = torch.max(outputs, dim=1)[1]
@@ -206,8 +221,8 @@ class Learner(BaseLearner):
         return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
 
-    def _eval_cnn(self, loader):
-        
+    def _eval_cnn(self, loader):#会计算topK
+
         self._network.eval()
         class_to_label = self.data_manager._class_to_label
         templates = self.data_manager._data_to_prompt

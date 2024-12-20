@@ -60,7 +60,7 @@ class ClsHead(torch.nn.Module):
         losses = self.loss(cls_score, gt_label, **kwargs)
         return losses
 
-    def pre_logits(self, x):
+    def norm(self, x):
         if isinstance(x, tuple):
             x = x[-1]
 

@@ -72,7 +72,7 @@ class BaseLearner(object):
 
     def _evaluate(self, y_pred, y_true):
         ret = {}
-        grouped = accuracy(y_pred.T[0], y_true, self._known_classes)
+        grouped = accuracy(y_pred.T[0], y_true, nb_old=self._known_classes)#total是所有seen class 的准确率
         ret["grouped"] = grouped
         ret["top1"] = grouped["total"]
         ret["top{}".format(self.topk)] = np.around((y_pred.T == np.tile(y_true, (self.topk, 1))).sum() * 100 / len(y_true),decimals=2)
@@ -91,7 +91,7 @@ class BaseLearner(object):
         cnn_accy = self._evaluate(y_pred, y_true)
 
         if hasattr(self, "_class_means"):
-            y_pred, y_true = self._eval_nme(self.test_loader, self._class_means)
+            y_pred, y_true = self._eval_nme(self.test_loader, self._class_means)# 评估 NME 算法 的结果，即按 prototype 相似度来选择结果，结果没有上面好
             nme_accy = self._evaluate(y_pred, y_true)
         else:
             nme_accy = None
@@ -212,7 +212,7 @@ class BaseLearner(object):
         return np.concatenate(vectors), np.concatenate(targets)
 
     def _reduce_exemplar(self, data_manager, m):
-        logging.info("Reducing exemplars...({} per classes)".format(m))
+        print("Reducing exemplars...({} per classes)".format(m))
         dummy_data, dummy_targets = copy.deepcopy(self._data_memory), copy.deepcopy(
             self._targets_memory
         )
@@ -248,7 +248,7 @@ class BaseLearner(object):
             self._class_means[class_idx, :] = mean
 
     def _construct_exemplar(self, data_manager, m):
-        logging.info("Constructing exemplars...({} per classes)".format(m))
+        print("Constructing exemplars...({} per classes)".format(m))
         for class_idx in range(self._known_classes, self._total_classes):
             data, targets, idx_dataset = data_manager.get_dataset(
                 np.arange(class_idx, class_idx + 1),
@@ -319,7 +319,7 @@ class BaseLearner(object):
             self._class_means[class_idx, :] = mean
 
     def _construct_exemplar_unified(self, data_manager, m):
-        logging.info(
+        print(
             "Constructing exemplars for new classes...({} per classes)".format(m)
         )
         _class_means = np.zeros((self._total_classes, self.feature_dim))

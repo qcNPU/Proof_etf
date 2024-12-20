@@ -6,6 +6,7 @@ from utils import factory
 from utils.data_manager import DataManager
 from utils.toolkit import count_parameters
 import os
+logging.basicConfig(level=logging.INFO)
 
 
 def train(args):
@@ -46,26 +47,26 @@ def _train(args):
     zs_seen_curve, zs_unseen_curve, zs_harmonic_curve, zs_total_curve = {"top1": [], "top5": []}, {"top1": [], "top5": []}, {"top1": [], "top5": []}, {"top1": [], "top5": []}
 
     for task in range(data_manager.nb_tasks):
-        logging.info("All params: {}".format(count_parameters(model._network)))
-        logging.info(
+        print("All params: {}".format(count_parameters(model._network)))
+        print(
             "Trainable params: {}".format(count_parameters(model._network, True))
         )
         model.incremental_train(data_manager)
         # cnn_accy, nme_accy = model.eval_task()
-        cnn_accy, nme_accy, zs_seen, zs_unseen, zs_harmonic, zs_total = model.eval_task()
+        # cnn_accy, nme_accy, zs_seen, zs_unseen, zs_harmonic, zs_total = model.eval_task()
         model.after_task()
 
        
-        logging.info("CNN: {}".format(cnn_accy["grouped"]))
+        # print("CNN: {}".format(cnn_accy["grouped"]))
+        #
+        # cnn_curve["top1"].append(cnn_accy["top1"])
+        # cnn_curve["top5"].append(cnn_accy["top5"])
+        #
+        # print("CNN top1 curve: {}".format(cnn_curve["top1"]))
+        # print("CNN top5 curve: {}\n".format(cnn_curve["top5"]))
 
-        cnn_curve["top1"].append(cnn_accy["top1"])
-        cnn_curve["top5"].append(cnn_accy["top5"])
-
-        logging.info("CNN top1 curve: {}".format(cnn_curve["top1"]))
-        logging.info("CNN top5 curve: {}\n".format(cnn_curve["top5"]))
-
-        print('Average Accuracy (CNN):', sum(cnn_curve["top1"])/len(cnn_curve["top1"]))
-        logging.info("Average Accuracy (CNN): {}".format(sum(cnn_curve["top1"])/len(cnn_curve["top1"])))
+        # print('Average Accuracy (CNN):', sum(cnn_curve["top1"])/len(cnn_curve["top1"]))
+        # print("Average Accuracy (CNN): {}".format(sum(cnn_curve["top1"])/len(cnn_curve["top1"])))
     
 def _set_device(args):
     device_type = args["device"]
@@ -92,4 +93,4 @@ def _set_random():
 
 def print_args(args):
     for key, value in args.items():
-        logging.info("{}: {}".format(key, value))
+        print("{}: {}".format(key, value))
