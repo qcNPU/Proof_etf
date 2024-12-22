@@ -69,10 +69,9 @@ class Learner(BaseLearner):
         self._cur_task += 1
         self._total_classes = self._known_classes + data_manager.get_task_size(self._cur_task)
 
-        self._network.update_prototype(self._total_classes)
-        self._network.update_context_prompt() # add context prompts
-
-        self._network.extend_task()
+        self._network.update_prototype(self._total_classes)  # copy旧类别的 prototype，增加新 task 的 prototype
+        self._network.update_context_prompt()  # add context prompts
+        self._network.extend_task()     # 增加新的 projection 层
 
         print("Learning on {}-{}".format(self._known_classes, self._total_classes))
         train_dataset = data_manager.get_dataset(np.arange(self._known_classes, self._total_classes),
@@ -85,16 +84,14 @@ class Learner(BaseLearner):
         test_dataset = data_manager.get_dataset(np.arange(0, self._total_classes), source="test", mode="test" )
         self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=num_workers)
 
-     #   train_dataset_for_protonet = data_manager.get_dataset(np.arange(self._known_classes, self._total_classes), source="train", mode="test", )
-     #   self.train_loader_for_protonet = DataLoader(train_dataset_for_protonet, batch_size=self.batch_size, shuffle=True, num_workers=num_workers)
-
+        # 取出当前 task 的 class 的数据，
         train_dataset_for_protonet=data_manager.get_dataset(np.arange(self._known_classes, self._total_classes),source="train", mode="test" )
         self.train_loader_for_protonet = DataLoader(train_dataset_for_protonet, batch_size=self.batch_size, shuffle=True, num_workers=num_workers)
 
         if len(self._multiple_gpus) > 1:
             print('Multiple GPUs')
             self._network = nn.DataParallel(self._network, self._multiple_gpus)
-
+        #  送入预训练 image encoder 计算 class prototype，不过 projection 层
         self.cal_prototype(self.train_loader_for_protonet, self._network)
         self._train_proj(self.train_loader, self.test_loader, self.train_loader_for_protonet)
         self.build_rehearsal_memory(data_manager, self.samples_per_class)
@@ -122,9 +119,9 @@ class Learner(BaseLearner):
         prog_bar = tqdm(range(self.tuned_epoch))
         cliploss = ClipLoss()
         total_cls_names = class_to_label[:self._total_classes] # mask all known classes
-        total_class = self.data_manager._class_order[:self._total_classes]
-        total_target = torch.tensor(total_class, dtype=torch.int64).to(self._device)
-        self.total_class = total_target
+        seen_class = self.data_manager._class_order[:self._total_classes]
+        # seen_target = torch.tensor(seen_class, dtype=torch.int64).to(self._device)
+        # self.seen_class = seen_target
         for _, epoch in enumerate(prog_bar):
             self._network.train()
             losses = 0.0
@@ -143,11 +140,11 @@ class Learner(BaseLearner):
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
                 image_features, text_features, logit_scale, proto_feas=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
                 # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
-                loss_etf1 = self._network.eft_head.forward_train(text_features, total_target)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                loss_etf2 = self._network.eft_head.forward_train(image_features, targets)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                loss_etf1 = self._network.eft_head.forward_train(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                # loss_etf2 = self._network.eft_head.forward_train(image_features, targets)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 # loss_etf3 = self._network.eft_head.forward_train(proto_feas, total_target)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                loss_etf = 3*(loss_etf1+loss_etf2)
-                # loss_etf = 3 * loss_etf1
+                loss_etf = 3 * loss_etf1
+                # loss_etf = 3*(loss_etf1+loss_etf2)
                 logits = image_features@text_features.T # [bs, allclasses]
                 # etf_outputs = self._network.eft_head.get_eft_logits(image_features, self.total_class)
                 # logits = logits + 100*etf_outputs
@@ -162,7 +159,7 @@ class Learner(BaseLearner):
 
                 protoloss = F.cross_entropy(image_features @ proto_feas.T, targets)
 
-                print(f"Loss:  text match :{loss},clipCE:{clip_loss},visual match:{protoloss},etf_loss:{loss_etf}")
+                # print(f"Loss:  text match :{loss},clipCE:{clip_loss},visual match:{protoloss},etf_loss:{loss_etf}")
                 total_loss = loss+clip_loss+protoloss + loss_etf
 
                 optimizer.zero_grad()
@@ -181,7 +178,7 @@ class Learner(BaseLearner):
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
             # prog_bar.set_description(info)
             print(info)
-
+        self._network.eft_head.clear_assignment(self._total_classes)
 
 
 
