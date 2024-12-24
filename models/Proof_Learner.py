@@ -93,10 +93,11 @@ class Learner(BaseLearner):
             self._network = nn.DataParallel(self._network, self._multiple_gpus)
         #  送入预训练 image encoder 计算 class prototype，不过 projection 层
         self.cal_prototype(self.train_loader_for_protonet, self._network)
-        self._train_proj(self.train_loader, self.test_loader, self.train_loader_for_protonet)
+        acc = self._train_proj(self.train_loader, self.test_loader, self.train_loader_for_protonet)
         self.build_rehearsal_memory(data_manager, self.samples_per_class)
         if len(self._multiple_gpus) > 1:
             self._network = self._network.module
+        return acc
 
     def _train_proj(self, train_loader, test_loader, train_loader_for_protonet):
         self._train_transformer=True
@@ -193,6 +194,7 @@ class Learner(BaseLearner):
             # prog_bar.set_description(info)
             print(info)
         # self._network.eft_head.clear_assignment(self._total_classes)
+        return test_acc
 
 
 

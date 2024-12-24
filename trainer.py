@@ -51,7 +51,7 @@ def _train(args):
         print(
             "Trainable params: {}".format(count_parameters(model._network, True))
         )
-        model.incremental_train(data_manager)
+        acc = model.incremental_train(data_manager)
         # cnn_accy, nme_accy = model.eval_task()
         # cnn_accy, nme_accy, zs_seen, zs_unseen, zs_harmonic, zs_total = model.eval_task()
         model.after_task()
@@ -59,6 +59,8 @@ def _train(args):
        
         # print("CNN: {}".format(cnn_accy["grouped"]))
         #
+        cnn_curve["top1"].append(acc)
+        print("task acc:",cnn_curve["top1"])
         # cnn_curve["top1"].append(cnn_accy["top1"])
         # cnn_curve["top5"].append(cnn_accy["top5"])
         #
