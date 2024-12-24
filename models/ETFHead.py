@@ -107,10 +107,10 @@ class ETFHead(ClsHead):
         x = x / torch.norm(x, p=2, dim=1, keepdim=True)
         return x
 
-    def forward_train(self, x: torch.Tensor, gt_label, **kwargs) -> Dict:
+
+    def forward_train_v1(self, match_vec, gt_label, **kwargs) -> Dict:
         """Forward training data."""
-        x = self.norm(x)
-        # target = self.etf_vec[:, gt_label].t()  # 直接把图片特征往设定好的 ETF 向量上 pull
+        x = self.norm(match_vec)
         target = self.assign_target(x, gt_label)
         losses = self.loss(x, target)
         if self.cal_acc:
@@ -124,28 +124,47 @@ class ETFHead(ClsHead):
                 }
         return losses
 
+
+    def forward_train(self, match_vec,optimize_vec, gt_label, **kwargs) -> Dict:
+        """Forward training data."""
+        x = self.norm(match_vec)
+        target = self.assign_target(x, gt_label)
+        opti = self.norm(optimize_vec)
+        losses = self.loss(opti, target)
+        if self.cal_acc:
+            with torch.no_grad():
+                cls_score = x @ self.etf_vec
+                acc = self.compute_accuracy(cls_score[:, :self.eval_classes], gt_label)
+                assert len(acc) == len(self.topk)
+                losses['accuracy'] = {
+                    f'top-{k}': a
+                    for k, a in zip(self.topk, acc)
+                }
+        return losses
+
     def assign_target(self, source, source_labels):
         # new_lb = [i for i in source_labels if self.assignInfo.get(i.item()) is None]
-        new_lb = list({i for i in source_labels if self.assignInfo.get(i) is None})
+        new_lb = {ind: lb for ind, lb in enumerate(source_labels) if self.assignInfo.get(lb) is None}
 
         if len(new_lb) > 0:
             # Normalise incoming prototypes
             # base_prototypes = normalize(source[-len(new_lb):,:])
-            base_prototypes = normalize(source)
+            keys = {ind:lb for ind,lb in enumerate(list(new_lb.values()))}
+            base_prototypes = source[list(new_lb.keys())]  # 按照索引顺序取出源向量
             # 根据与class prototype 的相似度从初始化向量池中选择最相似的
             cost = cosine_similarity(base_prototypes.detach().cpu(), self.etf_vec.cpu())
             # col_ind = self.get_assignment(cost, maximize=True)
             # labels 只用来记录哪个类别选了哪个向量
             row_id, col_ind = linear_sum_assignment(cost, maximize=True)
-            for i, label in enumerate(new_lb):
+            for i, label in keys.items():
                 self.assignInfo[label] = self.etf_vec[col_ind[i]].view(-1, self.in_channels)  # 把 value 直接变成向量
                 self.assignIndex[label] = col_ind[i]  # 先存着后面用
 
             # Remove from the final rv ，将已分配的向量从池子中去掉
-            # all_idx = np.arange(self.etf_vec.shape[0])
-            # etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
-            # del self.etf_vec
-            # self.register_buffer('etf_vec', etf_vec)
+            all_idx = np.arange(self.etf_vec.shape[0])
+            etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
+            del self.etf_vec
+            self.register_buffer('etf_vec', etf_vec)
             print(f"assignIndex: {self.assignIndex}")
         # 将类别对应的 target 向量返回
         assign_target = torch.cat([self.assignInfo[label] for label in source_labels], dim=0)

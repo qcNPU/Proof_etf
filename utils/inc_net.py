@@ -405,7 +405,7 @@ class Proof_Net(SimpleClipNet):
 
     def encode_image(self, x, normalize: bool = False):
         x = x.to(self._device)
-        basic_img_features = self.convnet.encode_image(x)
+        basic_img_features = self.convnet.encode_image(x)  # 先经过冻结的 encoder 获取 feature
         img_features = [proj(basic_img_features) for proj in self.projs_img]
         img_features = torch.stack(img_features, dim=1)#[bs,num_proj,dim]
         image_feas = torch.sum(img_features, dim=1)#[bs,dim]
@@ -413,18 +413,38 @@ class Proof_Net(SimpleClipNet):
         
     def encode_text(self, x, normalize: bool = False):
         x = x.to(self._device)
-        basic_text_features = self.convnet.encode_text(x)
+        basic_text_features = self.convnet.encode_text(x)   # 将每个 text 送入所有 projection，最后在 projection 层面加和
         text_features = [proj(basic_text_features) for proj in self.projs_text]
         text_features = torch.stack(text_features, dim=1)
         text_feas = torch.sum(text_features, dim=1) #[bs,dim]
         return F.normalize(text_feas, dim=-1) if normalize else text_feas
-        
+
+
+    def encode_text_2(self, x, normalize: bool = False):
+        x = x.to(self._device)
+        basic_text_features = self.convnet.encode_text(x)   # 将每个 text 送入所有 projection，最后在 projection 层面加和
+        text_features = [proj(basic_text_features) for proj in self.projs_text]
+        text_features = torch.stack(text_features, dim=1)
+        text_feas = torch.sum(text_features, dim=1) #[bs,dim]
+        return F.normalize(text_feas, dim=-1) if normalize else text_feas,basic_text_features
+
+
+
     def encode_prototpyes(self, normalize: bool = False):
         self.img_prototypes=self.img_prototypes.to(self._device)
-        img_features = [proj(self.img_prototypes) for proj in self.projs_img]
+        img_features = [proj(self.img_prototypes) for proj in self.projs_img]   #将prototype送入分别所有projection 层，最后在 projection 维度加和
         img_features=torch.stack(img_features, dim=1)#[nb_class,num_proj,dim]
         image_feas=torch.sum(img_features, dim=1)#[nb_class,dim]
         return F.normalize(image_feas, dim=-1) if normalize else image_feas
+
+
+    def encode_prototpyes_v2(self, normalize: bool = False):
+        self.img_prototypes=self.img_prototypes.to(self._device)
+        img_features = [proj(self.img_prototypes) for proj in self.projs_img]   #将prototype送入分别所有projection 层，最后在 projection 维度加和
+        img_features=torch.stack(img_features, dim=1)#[nb_class,num_proj,dim]
+        image_feas=torch.sum(img_features, dim=1)#[nb_class,dim]
+        return F.normalize(image_feas, dim=-1) if normalize else image_feas,
+
 
     def extend_task(self):
         self.projs_img.append(self.extend_item())

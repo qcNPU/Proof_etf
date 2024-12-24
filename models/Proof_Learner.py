@@ -75,7 +75,7 @@ class Learner(BaseLearner):
 
         print("Learning on {}-{}".format(self._known_classes, self._total_classes))
         train_dataset = data_manager.get_dataset(np.arange(self._known_classes, self._total_classes),
-            source="train", mode="train", appendent=self._get_memory())
+            source="train", mode="train", appendent=self._get_memory())  #train data 里有旧 class 的数据
         self.train_dataset=train_dataset
         self.data_manager=data_manager
         self._network.to(self._device)
@@ -119,7 +119,7 @@ class Learner(BaseLearner):
         prog_bar = tqdm(range(self.tuned_epoch))
         cliploss = ClipLoss()
         total_cls_names = class_to_label[:self._total_classes] # mask all known classes
-        seen_class = self.data_manager._class_order[:self._total_classes]
+        seen_class = list(range(self._total_classes))
         # seen_target = torch.tensor(seen_class, dtype=torch.int64).to(self._device)
         # self.seen_class = seen_target
         for _, epoch in enumerate(prog_bar):
@@ -128,23 +128,37 @@ class Learner(BaseLearner):
             correct, total = 0, 0
             for i, (_, inputs, targets) in enumerate(train_loader):
                 cls_names = [class_to_label[y] for y in targets]  #把 target 数字变成 class name
-
                 inputs = inputs.to(self._device)
                 targets = targets.to(self._device)
 
                 texts = [templates.format(inst) for inst in total_cls_names]
                 texts = self._network.tokenizer(texts).to(self._device)
-                text_features = self._network.encode_text(texts) # [total_classes, dim]
+                # text_features = self._network.encode_text(texts) # [total_classes, dim]
+                text_features,origin_text_features = self._network.encode_text_2(texts) # [total_classes, dim]
                 text_feas = text_features / text_features.norm(dim=-1, keepdim=True)
+                origin_text_feas = origin_text_features / origin_text_features.norm(dim=-1, keepdim=True)
+
                 image_features = self._network.encode_image(inputs)
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
-                image_features, text_features, logit_scale, proto_feas=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
+
+                # origin_proto_feas = self._network.img_prototypes
+                # proto_feas = self._network.encode_prototpyes(normalize=True)
+                # loss_etf1 = self._network.eft_head.forward_train_v1(origin_text_feas, seen_class)["loss"]
+                # loss_etf1 = self._network.eft_head.forward_train(origin_text_feas, text_feas, seen_class)["loss"]
+                # loss_etf2 = self._network.eft_head.forward_train(origin_text_feas, proto_feas, seen_class)["loss"]
+                origin_proto_feas = self._network.img_prototypes
+                image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
+
                 # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
-                loss_etf1 = self._network.eft_head.forward_train(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                # loss_etf2 = self._network.eft_head.forward_train(image_features, targets)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                # loss_etf3 = self._network.eft_head.forward_train(proto_feas, total_target)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                loss_etf = 3 * loss_etf1
-                # loss_etf = 3*(loss_etf1+loss_etf2)
+                # loss_etf1 = self._network.eft_head.forward_train(text_features,text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                # loss_etf2 = self._network.eft_head.forward_train(text_features,proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                # loss_etf3 = self._network.eft_head.forward_train(text_features,image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                # loss_etf = 3*(loss_etf1)
+                loss_etf = 3*(loss_etf1+loss_etf2)
+                # loss_etf = 3 * (loss_etf1 + loss_etf3+loss_etf2)
                 logits = image_features@text_features.T # [bs, allclasses]
                 # etf_outputs = self._network.eft_head.get_eft_logits(image_features, self.total_class)
                 # logits = logits + 100*etf_outputs
@@ -157,7 +171,7 @@ class Learner(BaseLearner):
 
                 loss = F.cross_entropy(logits, targets)
 
-                protoloss = F.cross_entropy(image_features @ proto_feas.T, targets)
+                protoloss = F.cross_entropy(image_features @ proto_features.T, targets)
 
                 # print(f"Loss:  text match :{loss},clipCE:{clip_loss},visual match:{protoloss},etf_loss:{loss_etf}")
                 total_loss = loss+clip_loss+protoloss + loss_etf
@@ -178,7 +192,7 @@ class Learner(BaseLearner):
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
             # prog_bar.set_description(info)
             print(info)
-        self._network.eft_head.clear_assignment(self._total_classes)
+        # self._network.eft_head.clear_assignment(self._total_classes)
 
 
 

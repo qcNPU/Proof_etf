@@ -160,10 +160,10 @@ class DataManager(object):
         else:
             order = idata.class_order
         self._class_order = order
-        logging.info(self._class_order)
+        print(f"After shuffle, class order：{self._class_order}")
 
         # Map indices
-        self._train_targets = _map_new_class_index(self._train_targets, self._class_order)
+        self._train_targets = _map_new_class_index(self._train_targets, self._class_order)  # 将原数据中class 的 label 按照 class order 的顺序替换掉
         self._test_targets = _map_new_class_index(self._test_targets, self._class_order)
 
         _class_to_label=[self._class_to_label[i] for i in self._class_order]
@@ -209,7 +209,7 @@ class DummyDataset(Dataset):
             image = self.trsf(pil_loader(self.images[idx]))
         else:
             image = self.trsf(Image.fromarray(self.images[idx]))
-        label = self.labels[idx]
+        label = self.labels[idx]   # 根据索引 idx 从前面生成的 labels 中获取修改之后的 label
 
         return idx, image, label
 
