@@ -122,7 +122,7 @@ class Learner(BaseLearner):
         total_cls_names = class_to_label[:self._total_classes] # mask all known classes
         seen_class = list(range(self._total_classes))
         # seen_target = torch.tensor(seen_class, dtype=torch.int64).to(self._device)
-        # self.seen_class = seen_target
+        self.seen_class = seen_class
         for _, epoch in enumerate(prog_bar):
             self._network.train()
             losses = 0.0
@@ -193,10 +193,8 @@ class Learner(BaseLearner):
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
             # prog_bar.set_description(info)
             print(info)
-        # self._network.eft_head.clear_assignment(self._total_classes)
+        self._network.eft_head.clear_assignment(self._total_classes)
         return test_acc
-
-
 
     def _compute_accuracy(self, model, loader):# 只计算 top1
         self._network.eval()
@@ -224,9 +222,9 @@ class Learner(BaseLearner):
                 outputs = transf_image_features @ transf_text_features.T
                 proto_outputs= transf_image_features @ proto_feas.T
                 original_outputs= image_features @ text_features.T
-                # etf_outputs = self._network.eft_head.get_eft_logits(transf_image_features,self.total_class)
-                # outputs = original_outputs+outputs+proto_outputs + 100*etf_outputs
-                outputs = original_outputs+outputs+proto_outputs
+                etf_outputs = self._network.eft_head.get_eft_logits(transf_image_features,self.seen_class)
+                outputs = original_outputs+outputs+proto_outputs + 10*etf_outputs
+                # outputs = original_outputs+outputs+proto_outputs
 
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == targets).sum()

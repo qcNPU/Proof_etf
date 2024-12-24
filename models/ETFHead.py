@@ -161,10 +161,10 @@ class ETFHead(ClsHead):
                 self.assignIndex[label] = col_ind[i]  # 先存着后面用
 
             # Remove from the final rv ，将已分配的向量从池子中去掉
-            all_idx = np.arange(self.etf_vec.shape[0])
-            etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
-            del self.etf_vec
-            self.register_buffer('etf_vec', etf_vec)
+            # all_idx = np.arange(self.etf_vec.shape[0])
+            # etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
+            # del self.etf_vec
+            # self.register_buffer('etf_vec', etf_vec)
             print(f"assignIndex: {self.assignIndex}")
         # 将类别对应的 target 向量返回
         assign_target = torch.cat([self.assignInfo[label] for label in source_labels], dim=0)
@@ -181,7 +181,8 @@ class ETFHead(ClsHead):
         return col_ind
 
     def get_eft_logits(self, x, total_class):
-        x = self.norm(x)
+        # x = self.norm(x)
+        #有缓存， 直接获取的是前面分配的target
         assign_target = self.assign_target(x, total_class)
         cls_score = (x @ assign_target.T)  # text feature 和 etf 对齐之后，etf 就不在分类中起作用了，不然没法 test
         return cls_score
