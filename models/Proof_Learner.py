@@ -161,8 +161,8 @@ class Learner(BaseLearner):
                 loss_etf = 3*(loss_etf1+loss_etf2)
                 # loss_etf = 3 * (loss_etf1 + loss_etf3+loss_etf2)
                 logits = image_features@text_features.T # [bs, allclasses]
-                # etf_outputs = self._network.eft_head.get_eft_logits(image_features, self.total_class)
-                # logits = logits + 100*etf_outputs
+                # etf_outputs = self._network.eft_head.get_eft_logits(image_features, self.seen_class)
+                # logits = logits + etf_outputs
 
                 texts=[templates.format(inst) for inst in cls_names]
                 clip_text_feas=self._network.encode_text(self._network.tokenizer(texts).to(self._device))#total,dim
@@ -222,9 +222,10 @@ class Learner(BaseLearner):
                 outputs = transf_image_features @ transf_text_features.T
                 proto_outputs= transf_image_features @ proto_feas.T
                 original_outputs= image_features @ text_features.T
-                etf_outputs = self._network.eft_head.get_eft_logits(transf_image_features,self.seen_class)
-                outputs = original_outputs+outputs+proto_outputs + 10*etf_outputs
+                # etf_outputs = self._network.eft_head.get_eft_logits(transf_image_features,self.seen_class)
+                # outputs = original_outputs+outputs+proto_outputs + etf_outputs
                 # outputs = original_outputs+outputs+proto_outputs
+                outputs = outputs+proto_outputs
 
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == targets).sum()
