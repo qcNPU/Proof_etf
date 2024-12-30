@@ -12,6 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from utils.logger import get_root_logger
 from utils.toolkit import normalize
+import torch.nn.functional as F
 from .cls_head import ClsHead
 
 
@@ -74,7 +75,7 @@ class ETFHead(ClsHead):
         in_channels (int): Number of channels in the input feature map.
     """
 
-    def __init__(self, num_classes: int, in_channels: int, *args, **kwargs) -> None:
+    def __init__(self, num_classes: int, in_channels: int,device, *args, **kwargs) -> None:
         if kwargs.get('eval_classes', None):
             self.eval_classes = kwargs.pop('eval_classes')
         else:
@@ -86,9 +87,9 @@ class ETFHead(ClsHead):
 
         self.num_classes = num_classes
         self.in_channels = in_channels
+        self.device = device
         logger = get_root_logger()
         logger.info("ETF head : evaluating {} out of {} classes.".format(self.eval_classes, self.num_classes))
-        # logger.info("ETF head : with_len : {}".format(self.with_len))
 
         orth_vec = generate_random_orthogonal_matrix(self.in_channels, self.num_classes)
         i_nc_nc = torch.eye(self.num_classes)
@@ -96,12 +97,35 @@ class ETFHead(ClsHead):
         etf_vec = torch.mul(torch.matmul(orth_vec, i_nc_nc - one_nc_nc),
                             math.sqrt(self.num_classes / (self.num_classes - 1)))
         self.register_buffer('etf_vec', etf_vec.T)
-        self.register_buffer('etf_vec_copy', deepcopy(etf_vec))
         self.assignInfo = {}
         self.assignIndex = {}
         self.reserve_vector_count = 100  # modify this with class_nums
-        etf_rect = torch.ones((1, num_classes), dtype=torch.float32)
-        self.etf_rect = etf_rect
+
+        self.projector = self.select_projector(512,2048,512)
+        self.classifiers = nn.Sequential()
+
+    def select_projector(self,in_dim,hidden_dim,out_dim):
+        proj_type = "proj"
+        if proj_type == "proj":
+            # projector
+            projector = nn.Sequential(
+                nn.Linear(in_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, out_dim),
+            )
+        elif proj_type == "proj_ncfscil":
+            projector = nn.Sequential(
+                nn.Linear(self.encoder_outdim, self.encoder_outdim * 2),
+                nn.BatchNorm1d(self.encoder_outdim * 2),
+                nn.LeakyReLU(0.1),
+                nn.Linear(self.encoder_outdim * 2, self.encoder_outdim * 2),
+                nn.BatchNorm1d(self.encoder_outdim * 2),
+                nn.LeakyReLU(0.1),
+                nn.Linear(self.encoder_outdim * 2, self.proj_output_dim, bias=False),
+            )
+
+        return projector
+
 
     def norm(self, x):
         x = x / torch.norm(x, p=2, dim=1, keepdim=True)
@@ -144,7 +168,7 @@ class ETFHead(ClsHead):
 
     def assign_target(self, source, source_labels):
         # new_lb = [i for i in source_labels if self.assignInfo.get(i.item()) is None]
-        new_lb = {ind: lb for ind, lb in enumerate(source_labels) if self.assignInfo.get(lb) is None}
+        new_lb = {ind: lb for ind, lb in enumerate(source_labels) if self.assignInfo.get(lb) is None}  # 字典去重
 
         if len(new_lb) > 0:
             # Normalise incoming prototypes
@@ -153,18 +177,23 @@ class ETFHead(ClsHead):
             base_prototypes = source[list(new_lb.keys())]  # 按照索引顺序取出源向量
             # 根据与class prototype 的相似度从初始化向量池中选择最相似的
             cost = cosine_similarity(base_prototypes.detach().cpu(), self.etf_vec.cpu())
-            # col_ind = self.get_assignment(cost, maximize=True)
             # labels 只用来记录哪个类别选了哪个向量
             row_id, col_ind = linear_sum_assignment(cost, maximize=True)
+
+            new_fc_tensor = self.etf_vec[col_ind]
+            # Creating and appending a new classifier from the given reserved vectors
+            new_fc = nn.Linear(new_fc_tensor.shape[1], new_fc_tensor.shape[0], bias=False)
+            new_fc.weight.data.copy_(new_fc_tensor)
+            self.classifiers.append(new_fc)
             for i, label in keys.items():
                 self.assignInfo[label] = self.etf_vec[col_ind[i]].view(-1, self.in_channels)  # 把 value 直接变成向量
                 self.assignIndex[label] = col_ind[i]  # 先存着后面用
 
             # Remove from the final rv ，将已分配的向量从池子中去掉
-            # all_idx = np.arange(self.etf_vec.shape[0])
-            # etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
-            # del self.etf_vec
-            # self.register_buffer('etf_vec', etf_vec)
+            all_idx = np.arange(self.etf_vec.shape[0])
+            etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
+            del self.etf_vec
+            self.register_buffer('etf_vec', etf_vec)
             print(f"assignIndex: {self.assignIndex}")
         # 将类别对应的 target 向量返回
         assign_target = torch.cat([self.assignInfo[label] for label in source_labels], dim=0)
@@ -186,6 +215,18 @@ class ETFHead(ClsHead):
         assign_target = self.assign_target(x, total_class)
         cls_score = (x @ assign_target.T)  # text feature 和 etf 对齐之后，etf 就不在分类中起作用了，不然没法 test
         return cls_score
+
+
+    def get_classifier_logits(self, feat):
+        output = []
+        self.classifiers = self.classifiers.to(feat.device)
+        for i, cls in enumerate(self.classifiers.children()):
+            out = F.linear(F.normalize(feat, p=2, dim=-1), F.normalize(cls.weight, p=2, dim=-1))
+            # out = out / self.temperature
+            output.append(out)
+        output = torch.cat(output, axis = 1)
+        return output
+
 
     def loss(self, feat, target, **kwargs):
         losses = dict()

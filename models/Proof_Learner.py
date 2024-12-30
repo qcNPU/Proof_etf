@@ -91,7 +91,7 @@ class Learner(BaseLearner):
         if len(self._multiple_gpus) > 1:
             print('Multiple GPUs')
             self._network = nn.DataParallel(self._network, self._multiple_gpus)
-        #  送入预训练 image encoder 计算 class prototype，不过 projection 层
+        #  先送入预训练 image encoder 计算 新 task 的 class prototype，不经过 projection 层
         self.cal_prototype(self.train_loader_for_protonet, self._network)
         acc = self._train_proj(self.train_loader, self.test_loader, self.train_loader_for_protonet)
         self.build_rehearsal_memory(data_manager, self.samples_per_class)
@@ -142,12 +142,6 @@ class Learner(BaseLearner):
                 image_features = self._network.encode_image(inputs)
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
 
-                # origin_proto_feas = self._network.img_prototypes
-                # proto_feas = self._network.encode_prototpyes(normalize=True)
-                # loss_etf1 = self._network.eft_head.forward_train_v1(origin_text_feas, seen_class)["loss"]
-                # loss_etf1 = self._network.eft_head.forward_train(origin_text_feas, text_feas, seen_class)["loss"]
-                # loss_etf2 = self._network.eft_head.forward_train(origin_text_feas, proto_feas, seen_class)["loss"]
-                origin_proto_feas = self._network.img_prototypes
                 image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
 
                 # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
@@ -156,13 +150,35 @@ class Learner(BaseLearner):
                 # loss_etf3 = self._network.eft_head.forward_train(text_features,image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                # loss_etf = 3*(loss_etf1)
-                loss_etf = 3*(loss_etf1+loss_etf2)
-                # loss_etf = 3 * (loss_etf1 + loss_etf3+loss_etf2)
+                loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                # loss_etf = 10*(loss_etf1+loss_etf2)
+                loss_etf = 10 * (loss_etf1 + loss_etf3+loss_etf2)
+                # Cross Entropy
+                # projection = self._network.eft_head.projector(image_features)
+                projection = image_features
+                logits_clas = self._network.eft_head.get_classifier_logits(projection)
+                label_rep = targets
+                loss_classi = F.cross_entropy(logits_clas, label_rep)
+                loss_etf = loss_etf + loss_classi
+
                 logits = image_features@text_features.T # [bs, allclasses]
                 # etf_outputs = self._network.eft_head.get_eft_logits(image_features, self.seen_class)
-                # logits = logits + etf_outputs
+                # logits = logits + logits_clas
+
+                # outputs = logits
+                # proto_outputs= image_features @ proto_features.T
+                # original_outputs= img_feas @ text_feas.T
+                # etf_outputs = self._network.eft_head.get_eft_logits(transf_image_features,self.seen_class)
+                # outputs = original_outputs+outputs+proto_outputs + logits_clas
+                # outputs = original_outputs+outputs+proto_outputs
+                # 计算 logits 张量的 Log-Sum-Exp 相加
+                # logits_list = [original_outputs, outputs, proto_outputs,logits_clas]
+                # max_logit = torch.max(torch.stack(logits_list), dim=0)[0]  # 获取所有 logits 的最大值
+                # logits = torch.log(torch.sum(torch.exp(torch.stack(logits_list) - max_logit), dim=0)) + max_logit
+
+                # max_logit = torch.max(logits, logits_clas)
+                # logits_combined = torch.log(torch.exp(logits - max_logit) + torch.exp(logits_clas - max_logit)) + max_logit
+                # logits = logits_combined
 
                 texts=[templates.format(inst) for inst in cls_names]
                 clip_text_feas=self._network.encode_text(self._network.tokenizer(texts).to(self._device))#total,dim
@@ -193,7 +209,7 @@ class Learner(BaseLearner):
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
             # prog_bar.set_description(info)
             print(info)
-        self._network.eft_head.clear_assignment(self._total_classes)
+        # self._network.eft_head.clear_assignment(self._total_classes)
         return test_acc
 
     def _compute_accuracy(self, model, loader):# 只计算 top1
@@ -223,9 +239,15 @@ class Learner(BaseLearner):
                 proto_outputs= transf_image_features @ proto_feas.T
                 original_outputs= image_features @ text_features.T
                 # etf_outputs = self._network.eft_head.get_eft_logits(transf_image_features,self.seen_class)
-                # outputs = original_outputs+outputs+proto_outputs + etf_outputs
-                # outputs = original_outputs+outputs+proto_outputs
-                outputs = outputs+proto_outputs
+                # projection = self._network.eft_head.projector(transf_image_features)
+                # projection = transf_image_features
+                # logits_clas = self._network.eft_head.get_classifier_logits(projection)
+                # outputs = original_outputs+outputs+proto_outputs + logits_clas
+                outputs = original_outputs+outputs+proto_outputs
+                # 计算 logits 张量的 Log-Sum-Exp 相加
+                # logits_list = [original_outputs, outputs, proto_outputs,logits_clas]
+                # max_logit = torch.max(torch.stack(logits_list), dim=0)[0]  # 获取所有 logits 的最大值
+                # outputs = torch.log(torch.sum(torch.exp(torch.stack(logits_list) - max_logit), dim=0)) + max_logit
 
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == targets).sum()

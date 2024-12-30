@@ -5,7 +5,7 @@ from torch import nn
 from convs.linears import SimpleLinear, SplitCosineLinear, CosineLinear
 import timm
 import torch.nn.functional as F
-from convs.projections import Proj_Pure_MLP, MultiHeadAttention
+from convs.projections import Proj_Pure_MLP, MultiHeadAttention, Proj_MLP
 from utils.toolkit import get_attribute
 from models.ETFHead import ETFHead
 
@@ -381,9 +381,10 @@ class Proof_Net(SimpleClipNet):
         
         self.sel_attn = MultiHeadAttention(1, self.feature_dim, self.feature_dim, self.feature_dim, dropout=0.1)
         self.img_prototypes = None
-        self.eft_head = ETFHead(100, self.feature_dim)
+        self.eft_head = ETFHead(100, self.feature_dim,self._device)
 
         self.context_prompts = nn.ParameterList()
+
 
     def update_prototype(self, nb_classes):
         if self.img_prototypes is not None:
@@ -453,6 +454,8 @@ class Proof_Net(SimpleClipNet):
     def extend_item(self):
         if self.projtype=='pure_mlp':
             return Proj_Pure_MLP(self.feature_dim,self.feature_dim,self.feature_dim).to(self._device)
+        elif self.projtype=='mlp':
+            return Proj_MLP(self.feature_dim,self.feature_dim,self.feature_dim).to(self._device)
         else:
             raise NotImplementedError
     
@@ -544,6 +547,8 @@ class Proof_Net(SimpleClipNet):
             for param in self.projs_img[-1].parameters():
                 param.requires_grad = True
         for param in self.sel_attn.parameters():
+            param.requires_grad = True
+        for param in self.eft_head.projector.parameters():
             param.requires_grad = True
 
 

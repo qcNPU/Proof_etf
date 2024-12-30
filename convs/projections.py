@@ -17,6 +17,20 @@ class Proj_Pure_MLP(nn.Module):
         out = self.MLP(input)
         return out
 
+class Proj_MLP(nn.Module):
+    def __init__(self, in_features, out_features, middle_dim):
+        super(Proj_MLP, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.MLP = nn.Sequential(
+                nn.Linear(self.encoder_outdim, self.proj_hidden_dim),
+                nn.ReLU(),
+                nn.Linear(self.proj_hidden_dim, self.proj_output_dim),
+            )
+
+    def forward(self, input):
+        out = self.MLP(input)
+        return out
 
 
 class ScaledDotProductAttention(nn.Module):
