@@ -148,14 +148,13 @@ class Learner(BaseLearner):
                 # loss_etf1 = self._network.eft_head.forward_train(text_features,text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 # loss_etf2 = self._network.eft_head.forward_train(text_features,proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 # loss_etf3 = self._network.eft_head.forward_train(text_features,image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 # loss_etf = 10*(loss_etf1+loss_etf2)
                 loss_etf = 10 * (loss_etf1 + loss_etf3+loss_etf2)
                 # Cross Entropy
-                # projection = self._network.eft_head.projector(image_features)
-                projection = image_features
+                projection = self._network.eft_head.projector(image_features)
                 logits_clas = self._network.eft_head.get_classifier_logits(projection)
                 label_rep = targets
                 loss_classi = F.cross_entropy(logits_clas, label_rep)
@@ -209,7 +208,7 @@ class Learner(BaseLearner):
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
             # prog_bar.set_description(info)
             print(info)
-        # self._network.eft_head.clear_assignment(self._total_classes)
+        self._network.eft_head.clear_assignment(self._total_classes)
         return test_acc
 
     def _compute_accuracy(self, model, loader):# 只计算 top1

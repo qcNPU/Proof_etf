@@ -190,10 +190,10 @@ class ETFHead(ClsHead):
                 self.assignIndex[label] = col_ind[i]  # 先存着后面用
 
             # Remove from the final rv ，将已分配的向量从池子中去掉
-            all_idx = np.arange(self.etf_vec.shape[0])
-            etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
-            del self.etf_vec
-            self.register_buffer('etf_vec', etf_vec)
+            # all_idx = np.arange(self.etf_vec.shape[0])
+            # etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
+            # del self.etf_vec
+            # self.register_buffer('etf_vec', etf_vec)
             print(f"assignIndex: {self.assignIndex}")
         # 将类别对应的 target 向量返回
         assign_target = torch.cat([self.assignInfo[label] for label in source_labels], dim=0)
@@ -203,6 +203,7 @@ class ETFHead(ClsHead):
         # print(f"class 0-{class_num}, assignIndex: {self.assignIndex}")
         self.assignInfo = {}
         self.assignIndex = {}
+        self.classifiers = nn.Sequential()
 
     def get_assignment(self, cost, maximize=True):
         """Tak array with cosine scores and return the output col ind """
