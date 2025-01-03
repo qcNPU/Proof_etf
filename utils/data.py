@@ -9,6 +9,9 @@ class iData(object):
     common_trsf = []
     class_order = None
 
+    def download_data(self):
+        pass
+
 
 class iCIFAR10(iData):
     use_path = False
@@ -167,9 +170,10 @@ class iImageNet100(iData):
     class_order = np.arange(1000).tolist()
 
     def download_data(self):
-        assert 0, "You should specify the folder of your dataset"
-        train_dir = "[DATA-PATH]/train/"
-        test_dir = "[DATA-PATH]/val/"
+        # assert 0, "You should specify the folder of your dataset"
+        train_dir = "/home/qc/dataset/Imagenet100/train/"
+        test_dir = "/home/qc/dataset/Imagenet100/val/"
+        from datasets import load_dataset
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -190,8 +194,8 @@ class iImageNetR(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/data/sunhl/data/imagenet-r/train"
-        test_dir = "/data/sunhl/data/imagenet-r/test"
+        train_dir = "/home/qc/dataset/imagenetr/train"
+        test_dir = "/home/qc/dataset/imagenetr/test"
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)

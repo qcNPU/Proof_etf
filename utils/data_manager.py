@@ -223,6 +223,8 @@ def _get_idata(dataset_name):
         return iCIFAR224()
     elif name== "imagenetr":
         return iImageNetR()
+    elif name== "imagenet100":
+        return iImageNet100()
     elif name=="imageneta":
         return iImageNetA()
     elif name=="objectnet":

@@ -907,7 +907,7 @@
     "scuba_diver",
     "acorn"
     ],
-
+    "imagenet100": ["Americanegret", "Bread", "Grasshopper", "ModelT", "Oriole", "Persiancat", "Recordsheet", "Rottweiler", "SaintBernard", "Siamese", "Tram", "artichoke", "badger", "beerbottle", "birdhouse", "bottlecap", "butterfly", "butternutsquash", "carrier", "carton", "carwheel", "cassetteplayer", "catamaran", "chickadee", "chiffonier", "chimpanzee", "coffeepot", "convertible", "crocodile", "cucumber", "daybed", "desktopcomputer", "digitalclock", "dishrag", "dustcart", "firetruck", "fly", "freightcar", "gartersnake", "gibbon", "goldfish", "golfball", "gorilla", "greatgreyowl", "horn", "hourglass", "husky", "hyaena", "jeep", "keypad", "leatherbackturtle", "leopard", "limpkin", "lizard", "malamute", "mask", "matchstick", "measuringcup", "minibus", "missile", "mobilehome", "monitor", "moped", "numbfish", "ostrich", "person", "piano", "pooltable", "projector", "radiotelescope", "recreationalvehicle", "reflexcamera", "revolver", "rocker", "rule", "runningshoe", "schoolbus", "soapdispenser", "stonewall", "stoplight", "streetsign", "submarine", "suspensionbridge", "tabby", "tablelamp", "tank", "taxi", "thatch", "tileroof", "trifle", "trimaran", "vase", "warplane", "washer", "watertower", "web", "whitefox", "wolfspider", "wool", "yurt"],
     "food101": [
         "apple pie",
         "baby back ribs",

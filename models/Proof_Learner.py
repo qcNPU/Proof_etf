@@ -135,9 +135,8 @@ class Learner(BaseLearner):
                 texts = [templates.format(inst) for inst in total_cls_names]
                 texts = self._network.tokenizer(texts).to(self._device)
                 # text_features = self._network.encode_text(texts) # [total_classes, dim]
-                text_features,origin_text_features = self._network.encode_text_2(texts) # [total_classes, dim]
+                text_features = self._network.encode_text(texts) # [total_classes, dim]
                 text_feas = text_features / text_features.norm(dim=-1, keepdim=True)
-                origin_text_feas = origin_text_features / origin_text_features.norm(dim=-1, keepdim=True)
 
                 image_features = self._network.encode_image(inputs)
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
@@ -145,35 +144,21 @@ class Learner(BaseLearner):
                 image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
 
                 # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
-                # loss_etf1 = self._network.eft_head.forward_train(text_features,text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                # loss_etf2 = self._network.eft_head.forward_train(text_features,proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                # loss_etf3 = self._network.eft_head.forward_train(text_features,image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                 loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                # loss_etf = 10*(loss_etf1+loss_etf2)
-                loss_etf = 10 * (loss_etf1 + loss_etf3+loss_etf2)
+                # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                loss_etf = 10*(loss_etf1+loss_etf2)
+                # loss_etf = 10 * (loss_etf1 + loss_etf3+loss_etf2)
                 # Cross Entropy
-                projection = self._network.eft_head.projector(image_features)
-                logits_clas = self._network.eft_head.get_classifier_logits(projection)
-                label_rep = targets
-                loss_classi = F.cross_entropy(logits_clas, label_rep)
-                loss_etf = loss_etf + loss_classi
+                # projection = self._network.eft_head.projector(image_features)
+                # logits_clas = self._network.eft_head.get_classifier_logits(projection)
+                # label_rep = targets
+                # loss_classi = F.cross_entropy(logits_clas, label_rep)
+                # loss_etf = loss_etf + loss_classi
 
                 logits = image_features@text_features.T # [bs, allclasses]
                 # etf_outputs = self._network.eft_head.get_eft_logits(image_features, self.seen_class)
                 # logits = logits + logits_clas
-
-                # outputs = logits
-                # proto_outputs= image_features @ proto_features.T
-                # original_outputs= img_feas @ text_feas.T
-                # etf_outputs = self._network.eft_head.get_eft_logits(transf_image_features,self.seen_class)
-                # outputs = original_outputs+outputs+proto_outputs + logits_clas
-                # outputs = original_outputs+outputs+proto_outputs
-                # 计算 logits 张量的 Log-Sum-Exp 相加
-                # logits_list = [original_outputs, outputs, proto_outputs,logits_clas]
-                # max_logit = torch.max(torch.stack(logits_list), dim=0)[0]  # 获取所有 logits 的最大值
-                # logits = torch.log(torch.sum(torch.exp(torch.stack(logits_list) - max_logit), dim=0)) + max_logit
 
                 # max_logit = torch.max(logits, logits_clas)
                 # logits_combined = torch.log(torch.exp(logits - max_logit) + torch.exp(logits_clas - max_logit)) + max_logit
