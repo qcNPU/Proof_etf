@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.optimize import linear_sum_assignment
+from utils.cluster import KmeansPlus,soft_kmeans
 
 
 num_workers = 8
@@ -29,6 +30,7 @@ class Learner(BaseLearner):
 
         self.batch_size = get_attribute(args,"batch_size", 48)
         self.setting = get_attribute(args,"setting", "proof")
+        self.proto_num = get_attribute(args,"proto_num", 1)
         self.init_lr = get_attribute(args, "init_lr", 0.01)
         self.weight_decay = get_attribute(args, "weight_decay", 0.0005)
         self.min_lr = get_attribute(args, "min_lr", 1e-8)
@@ -63,7 +65,11 @@ class Learner(BaseLearner):
         for class_index in class_list:
             data_index=(label_list==class_index).nonzero().squeeze(-1)
             embedding=embedding_list[data_index]
-            proto=embedding.mean(0)
+            if self.proto_num  == 1:
+                proto=embedding.mean(0)
+            else:
+                centroids,_ = KmeansPlus(embedding,self.proto_num)
+                proto=torch.tensor(centroids).view(-1)
             self._network.img_prototypes[class_index]=proto
 
     def incremental_train(self, data_manager):
@@ -72,7 +78,7 @@ class Learner(BaseLearner):
 
         self._network.update_prototype(self._total_classes)  # copy旧类别的 prototype，增加新 task 的 prototype
         self._network.update_context_prompt()  # add context prompts
-        self._network.extend_task()     # 增加新的 projection 层
+        self._network.extend_projection()     # 增加新的 projection 层
 
         print("Learning on {}-{}".format(self._known_classes, self._total_classes))
         train_dataset = data_manager.get_dataset(np.arange(self._known_classes, self._total_classes),
@@ -143,8 +149,8 @@ class Learner(BaseLearner):
                 image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
                 if self.setting == "proofetf":
                     # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
-                    loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                    loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     loss_etf = 10*(loss_etf1+loss_etf2)
                 logits = image_features@text_features.T # [bs, allclasses]

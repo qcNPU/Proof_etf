@@ -132,7 +132,9 @@ class ETFHead(ClsHead):
 
 
     def forward_train_v1(self, match_vec, gt_label, **kwargs) -> Dict:
-        """Forward training data."""
+
+        if len(match_vec.shape)==3:  # 先用sum看下
+            match_vec = torch.sum(match_vec,dim=1)
         x = self.norm(match_vec)
         target = self.assign_target(x, gt_label)
         losses = self.loss(x, target)

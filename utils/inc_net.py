@@ -372,6 +372,7 @@ class SimpleClipNet(BaseNet):
 class Proof_Net(SimpleClipNet):
     def __init__(self, args, pretrained):
         super().__init__(args, pretrained)
+        self.proto_dim = None
         self.projs_img = nn.ModuleList()
         self.projs_text = nn.ModuleList()
         self.args = args
@@ -379,7 +380,7 @@ class Proof_Net(SimpleClipNet):
         self.projtype = get_attribute(self.args, 'projection_type', 'mlp')
         self.num_classes = get_attribute(self.args, 'num_classes', 100)
         self.context_prompt_length_per_task = get_attribute(self.args, 'context_prompt_length_per_task', 3)
-        
+        self.proto_num = get_attribute(args, "proto_num", 1)
         self.sel_attn = MultiHeadAttention(1, self.feature_dim, self.feature_dim, self.feature_dim, dropout=0.1)
         self.img_prototypes = None
         self.eft_head = ETFHead(self.num_classes, self.feature_dim,self._device)
@@ -388,11 +389,12 @@ class Proof_Net(SimpleClipNet):
 
 
     def update_prototype(self, nb_classes):
+        self.proto_dim = self.feature_dim*self.proto_num
         if self.img_prototypes is not None:
             nb_output = len(self.img_prototypes)
-            self.img_prototypes = torch.cat([copy.deepcopy(self.img_prototypes).to(self._device), torch.zeros(nb_classes - nb_output, self.feature_dim).to(self._device)]).to(self._device)
+            self.img_prototypes = torch.cat([copy.deepcopy(self.img_prototypes).to(self._device), torch.zeros(nb_classes - nb_output, self.proto_dim).to(self._device)]).to(self._device)
         else:
-            self.img_prototypes = torch.zeros(nb_classes, self.feature_dim).to(self._device)
+            self.img_prototypes = torch.zeros(nb_classes, self.proto_dim).to(self._device)
         print('update prototype, now we have {} prototypes'.format(self.img_prototypes.shape[0]))
     
     def update_context_prompt(self):
@@ -431,24 +433,21 @@ class Proof_Net(SimpleClipNet):
         return F.normalize(text_feas, dim=-1) if normalize else text_feas,basic_text_features
 
 
-
     def encode_prototpyes(self, normalize: bool = False):
         self.img_prototypes=self.img_prototypes.to(self._device)
-        img_features = [proj(self.img_prototypes) for proj in self.projs_img]   #将prototype送入分别所有projection 层，最后在 projection 维度加和
+        img_features = [self.multiproto_proj(self.img_prototypes,proj) for proj in self.projs_img]   #将prototype送入分别所有projection 层，最后在 projection 维度加和
         img_features=torch.stack(img_features, dim=1)#[nb_class,num_proj,dim]
         image_feas=torch.sum(img_features, dim=1)#[nb_class,dim]
         return F.normalize(image_feas, dim=-1) if normalize else image_feas
 
-
-    def encode_prototpyes_v2(self, normalize: bool = False):
-        self.img_prototypes=self.img_prototypes.to(self._device)
-        img_features = [proj(self.img_prototypes) for proj in self.projs_img]   #将prototype送入分别所有projection 层，最后在 projection 维度加和
-        img_features=torch.stack(img_features, dim=1)#[nb_class,num_proj,dim]
-        image_feas=torch.sum(img_features, dim=1)#[nb_class,dim]
-        return F.normalize(image_feas, dim=-1) if normalize else image_feas,
+    def multiproto_proj(self,protos,proj):
+        split_protos = [protos[:,i*self.feature_dim:(i+1)*self.feature_dim] for i in range(self.proto_num)]
+        proj_protos = [proj(i) for i in split_protos]
+        return torch.cat(proj_protos,dim=1)
+        # return torch.stack(proj_protos,dim=0).permute(1,0,2)
 
 
-    def extend_task(self):
+    def extend_projection(self):
         self.projs_img.append(self.extend_item())
         self.projs_text.append(self.extend_item())
 
@@ -503,14 +502,14 @@ class Proof_Net(SimpleClipNet):
         prototype_features = self.encode_prototpyes(normalize=True) if prototype_features is None else prototype_features
         if transformer:
             context_prompts = self.get_context_prompts()
-            len_texts = text_features.shape[0]
-            len_protos = prototype_features.shape[0]
-            len_context_prompts = context_prompts.shape[0]
             # restack the features and pass them through the attention layer
             image_features = image_features.view(image_features.shape[0], -1, self.feature_dim) #[bs, 1, dim]
             text_features = text_features.view(text_features.shape[0], self.feature_dim) #[total_classes, dim]
-            prototype_features = prototype_features.view(prototype_features.shape[0], self.feature_dim) #[len_pro, dim]
+            prototype_features = prototype_features.view(-1, self.feature_dim) #[len_pro, dim]
             context_prompts = context_prompts.view(context_prompts.shape[0], self.feature_dim) #[len_con_pro, dim]
+            len_texts = text_features.shape[0]
+            len_protos = prototype_features.shape[0]*prototype_features.shape[1]
+            len_context_prompts = context_prompts.shape[0]
             # expand text features to be the same dim as image features
             text_features = text_features.expand(image_features.shape[0], text_features.shape[0], self.feature_dim) #[bs, total_classes, dim]
             prototype_features = prototype_features.expand(image_features.shape[0], prototype_features.shape[0], self.feature_dim) #[bs, len_pro, dim]
@@ -532,7 +531,7 @@ class Proof_Net(SimpleClipNet):
             # squeeze
             image_features = image_features.view(image_features.shape[0], -1)
             text_features = text_features.view(text_features.shape[0], -1)
-            prototype_features = prototype_features.view(prototype_features.shape[0], -1)
+            prototype_features = prototype_features.view(prototype_features.shape[0], -1,self.feature_dim)
             return image_features, text_features, self.convnet.logit_scale.exp(), prototype_features
         else:
             return image_features, text_features, self.convnet.logit_scale.exp(), prototype_features

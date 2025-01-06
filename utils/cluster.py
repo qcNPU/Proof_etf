@@ -45,25 +45,23 @@ def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4):
 
 def KmeansPlus(X,K):
     # 使用 Scikit-learn 的 KMeans 类进行聚类，K-means++ 默认被启用
-    kmeans = KMeans(n_clusters=K, init='k-means++', max_iter=300, n_init=10, random_state=42)
+    kmeans = KMeans(n_clusters=K, init='k-means++', max_iter=300, n_init='auto', random_state=42)
     kmeans.fit(X)
 
     # 获取簇中心和标签
     centroids = kmeans.cluster_centers_  # 簇中心
     labels = kmeans.labels_  # 每个点所属簇的标签
 
-    # 输出簇中心
-    print("簇中心:", centroids)
-
     # 可视化聚类结果
     plt.scatter(X[:, 0], X[:, 1], c=labels, cmap='viridis', marker='o')
     plt.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='X', s=200)  # 突出显示簇中心
     plt.title('K-means Clustering (K-means++)')
     plt.show()
+    return centroids,labels
 
 
 
-def KmeansPlus_c(X, K):
+def KmeansPlus_returnfeature(X, K):#这个是将属于各个簇的特征分别放到各个list中并返回
     clt = KMeans(n_clusters=K)
     clt.fit(X)
     labelIDs = np.unique(clt.labels_)
