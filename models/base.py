@@ -262,7 +262,7 @@ class BaseLearner(object):
             vectors, _ = self._extract_vectors(idx_loader)
             vectors = (vectors.T / (np.linalg.norm(vectors.T, axis=0) + EPSILON)).T
             class_mean = np.mean(vectors, axis=0)
-
+            m = min(m,vectors.shape[0])
             # Select
             selected_exemplars = []
             exemplar_vectors = []  # [n, feature_dim]

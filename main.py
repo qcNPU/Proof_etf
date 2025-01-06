@@ -19,8 +19,9 @@ def load_json(settings_path):
 
 def setup_parser():
     parser = argparse.ArgumentParser(description='Reproduce of multiple continual learning algorthms.')
-    # parser.add_argument('--config', type=str, default='./exps/cifar.json', help='Json file of settings.')
-    parser.add_argument('--config', type=str, default='./exps/imgnet100.json', help='Json file of settings.')
+    parser.add_argument('--config', type=str, default='./exps/cifar.json', help='Json file of settings.')
+    # parser.add_argument('--config', type=str, default='./exps/imgnet100.json', help='Json file of settings.')
+    # parser.add_argument('--config', type=str, default='./exps/imgnetr.json', help='Json file of settings.')
     return parser
 
 

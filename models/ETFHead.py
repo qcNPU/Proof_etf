@@ -99,7 +99,6 @@ class ETFHead(ClsHead):
         self.register_buffer('etf_vec', etf_vec.T)
         self.assignInfo = {}
         self.assignIndex = {}
-        self.reserve_vector_count = 100  # modify this with class_nums
 
         self.projector = self.select_projector(512,2048,512)
         self.classifiers = nn.Sequential()
@@ -200,10 +199,9 @@ class ETFHead(ClsHead):
         return assign_target
 
     def clear_assignment(self, class_num):
-        # print(f"class 0-{class_num}, assignIndex: {self.assignIndex}")
         self.assignInfo = {}
         self.assignIndex = {}
-        self.classifiers = nn.Sequential()
+        # self.classifiers = nn.Sequential()
 
     def get_assignment(self, cost, maximize=True):
         """Tak array with cosine scores and return the output col ind """

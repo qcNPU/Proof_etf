@@ -28,7 +28,7 @@ def get_convnet(args, pretrained=False):
             return model, preprocess, tokenizer
         elif backbone_name=='openai_clip':
             model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', pretrained='openai')
-            tokenizer = open_clip.get_tokenizer('ViT-B-16')
+            tokenizer = open_clip.tokenize
             model.out_dim = 512
             return model, preprocess, tokenizer
         else:
@@ -377,11 +377,12 @@ class Proof_Net(SimpleClipNet):
         self.args = args
         self._device = args["device"][0]
         self.projtype = get_attribute(self.args, 'projection_type', 'mlp')
+        self.num_classes = get_attribute(self.args, 'num_classes', 100)
         self.context_prompt_length_per_task = get_attribute(self.args, 'context_prompt_length_per_task', 3)
         
         self.sel_attn = MultiHeadAttention(1, self.feature_dim, self.feature_dim, self.feature_dim, dropout=0.1)
         self.img_prototypes = None
-        self.eft_head = ETFHead(100, self.feature_dim,self._device)
+        self.eft_head = ETFHead(self.num_classes, self.feature_dim,self._device)
 
         self.context_prompts = nn.ParameterList()
 
