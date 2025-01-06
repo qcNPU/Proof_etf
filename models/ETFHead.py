@@ -100,8 +100,8 @@ class ETFHead(ClsHead):
         self.assignInfo = {}
         self.assignIndex = {}
 
-        self.projector = self.select_projector(512,2048,512)
-        self.classifiers = nn.Sequential()
+        # self.projector = self.select_projector(512,2048,512)
+        # self.classifiers = nn.Sequential()
 
     def select_projector(self,in_dim,hidden_dim,out_dim):
         proj_type = "proj"
@@ -181,11 +181,11 @@ class ETFHead(ClsHead):
             # labels 只用来记录哪个类别选了哪个向量
             row_id, col_ind = linear_sum_assignment(cost, maximize=True)
 
-            new_fc_tensor = self.etf_vec[col_ind]
+            # new_fc_tensor = self.etf_vec[col_ind]
             # Creating and appending a new classifier from the given reserved vectors
-            new_fc = nn.Linear(new_fc_tensor.shape[1], new_fc_tensor.shape[0], bias=False)
-            new_fc.weight.data.copy_(new_fc_tensor)
-            self.classifiers.append(new_fc)
+            # new_fc = nn.Linear(new_fc_tensor.shape[1], new_fc_tensor.shape[0], bias=False)
+            # new_fc.weight.data.copy_(new_fc_tensor)
+            # self.classifiers.append(new_fc)
             for i, label in keys.items():
                 self.assignInfo[label] = self.etf_vec[col_ind[i]].view(-1, self.in_channels)  # 把 value 直接变成向量
                 self.assignIndex[label] = col_ind[i]  # 先存着后面用
