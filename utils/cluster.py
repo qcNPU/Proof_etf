@@ -3,8 +3,10 @@ from scipy.spatial.distance import cdist
 from sklearn.cluster import KMeans
 import torch
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 
-def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4):
+
+def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4,visualize=True):
     # X: 输入数据集，shape 为 (N, D)，N为样本数，D为特征数
     # K: 簇的数量
     # max_iters: 最大迭代次数
@@ -41,22 +43,58 @@ def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4):
 
         centroids = new_centroids
 
+
+    if visualize:
+        plt.figure(figsize=(8, 6))
+        # 使用 t-SNE 降维到 2D（为了可视化）
+        tsne = TSNE(n_components=2, random_state=42, init='pca')
+        X_tsne = tsne.fit_transform(X)
+
+        # 可视化聚类
+        plt.cla()  # 清空当前图像
+        for j in range(K):
+            plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=U[:, j], cmap='viridis', alpha=0.5, label=f"Cluster {j + 1}")
+        plt.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='X', s=200, label='Centroids')
+
+        # plt.title(f"Iteration {iteration + 1}")
+        plt.xlabel("t-SNE component 1")
+        plt.ylabel("t-SNE component 2")
+        plt.legend()
+        plt.colorbar(label="Membership degree")
+        plt.pause(0.1)  # 暂停一小段时间，更新图像
+        plt.show()
+
     return centroids, U
 
 def KmeansPlus(X,K):
     # 使用 Scikit-learn 的 KMeans 类进行聚类，K-means++ 默认被启用
-    kmeans = KMeans(n_clusters=K, init='k-means++', max_iter=300, n_init='auto', random_state=42)
+    kmeans = KMeans(n_clusters=K, init='k-means++', max_iter=300, n_init=10, random_state=42)
     kmeans.fit(X)
 
     # 获取簇中心和标签
     centroids = kmeans.cluster_centers_  # 簇中心
     labels = kmeans.labels_  # 每个点所属簇的标签
 
-    # 可视化聚类结果
-    plt.scatter(X[:, 0], X[:, 1], c=labels, cmap='viridis', marker='o')
-    plt.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='X', s=200)  # 突出显示簇中心
-    plt.title('K-means Clustering (K-means++)')
+    # 使用 t-SNE 将数据降到 2D
+    tsne = TSNE(n_components=2, random_state=42, init='pca')
+    X_tsne = tsne.fit_transform(X)
+    # 可视化 t-SNE 结果
+    plt.figure(figsize=(8, 6))
+
+    # 使用不同的颜色绘制每个簇的点
+    scatter = plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap='viridis', s=50, alpha=0.7)
+
+    # 添加颜色条
+    plt.colorbar(scatter)
+
+    # 设置标题
+    plt.title("K-means Clustering with t-SNE Visualization")
+    plt.xlabel("t-SNE component 1")
+    plt.ylabel("t-SNE component 2")
+
+    # 显示图像
     plt.show()
+
     return centroids,labels
 
 

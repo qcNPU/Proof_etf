@@ -466,10 +466,10 @@ class Proof_Net(SimpleClipNet):
             # restack the features and pass them through the attention layer
             image_features = image_features.view(image_features.shape[0], -1, self.feature_dim) #[bs, 1, dim]
             text_features = text_features.view(text_features.shape[0], self.feature_dim) #[total_classes, dim]
-            prototype_features = prototype_features.view(-1, self.feature_dim) #[len_pro, dim]
+            prototype_features = prototype_features.view(-1, self.feature_dim) #[len_pro, dim]30
             context_prompts = context_prompts.view(context_prompts.shape[0], self.feature_dim) #[len_con_pro, dim]
             len_texts = text_features.shape[0]
-            len_protos = prototype_features.shape[0]*prototype_features.shape[1]
+            len_protos = prototype_features.shape[0]
             len_context_prompts = context_prompts.shape[0]
             # expand text features to be the same dim as image features
             text_features = text_features.expand(image_features.shape[0], text_features.shape[0], self.feature_dim) #[bs, total_classes, dim]
@@ -492,7 +492,7 @@ class Proof_Net(SimpleClipNet):
             # squeeze
             image_features = image_features.view(image_features.shape[0], -1)
             text_features = text_features.view(text_features.shape[0], -1)
-            prototype_features = prototype_features.view(prototype_features.shape[0], -1,self.feature_dim)
+            prototype_features = prototype_features.view(-1, self.proto_num,self.feature_dim).squeeze(1)
             return image_features, text_features, self.convnet.logit_scale.exp(), prototype_features
         else:
             return image_features, text_features, self.convnet.logit_scale.exp(), prototype_features
