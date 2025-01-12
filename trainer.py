@@ -60,7 +60,8 @@ def _train(args):
         # print("CNN: {}".format(cnn_accy["grouped"]))
         #
         cnn_curve["top1"].append(acc)
-        print("task acc:",cnn_curve["top1"])
+        print("task acc:",cnn_curve["top1"],", avg:",sum(cnn_curve["top1"])/len(cnn_curve["top1"]))
+        # print("avg:",sum(cnn_curve["top1"])/len(cnn_curve["top1"]))
         # cnn_curve["top1"].append(cnn_accy["top1"])
         # cnn_curve["top5"].append(cnn_accy["top5"])
         #

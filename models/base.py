@@ -234,9 +234,7 @@ class BaseLearner(object):
             )
 
             # Exemplar mean
-            idx_dataset = data_manager.get_dataset(
-                [], source="train", mode="test", appendent=(dd, dt)
-            )
+            idx_dataset = data_manager.get_dataset([], source="train", mode="test", appendent=(dd, dt))
             idx_loader = DataLoader(
                 idx_dataset, batch_size=batch_size, shuffle=False, num_workers=4
             )

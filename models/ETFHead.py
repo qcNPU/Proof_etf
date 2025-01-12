@@ -67,6 +67,59 @@ class DRLoss(nn.Module):
         return loss * self.loss_weight
 
 
+from pytorch_metric_learning import losses
+
+class SupConLoss(nn.Module):
+    def __init__(self, temperature=1, base_temperature=1):
+        super(SupConLoss, self).__init__()
+        self.temperature = temperature
+        self.base_temperature = base_temperature
+        # lossss = losses.SupConLoss()
+
+    def forward(self, features, etf_targets, labels):
+        """
+        Args:
+            features: hidden vector of shape [bsz, dim], image features
+            labels: ground truth labels of shape [bsz]
+            etf_targets: target vectors of shape [num_classes, dim]
+        Returns:
+            A loss scalar.
+        """
+        device = features.device
+        batch_size = features.shape[0]
+        num_classes = etf_targets.shape[0]
+
+        # Normalize features and targets (assuming already normalized)
+        features = F.normalize(features, p=2, dim=1)  # Normalize features
+        etf_targets = F.normalize(etf_targets, p=2, dim=1)  # Normalize ETF targets
+
+        # Compute cosine similarity between features and targets: [batch_size, num_classes]
+        similarity_matrix = torch.matmul(features, etf_targets.T) / self.temperature  # [bsz, num_classes]
+
+        # Create a mask based on the labels, indicating the target index for each sample
+        mask = torch.zeros(batch_size, num_classes, device=device)
+        mask[torch.arange(batch_size), labels] = 1.0  # Only keep positive pairs for the correct class
+
+        # For numerical stability, subtract the max value for each row (logits normalization)
+        logits_max, _ = torch.max(similarity_matrix, dim=1, keepdim=True)
+        logits = similarity_matrix - logits_max.detach()   #去掉剪max
+
+        # Compute log probability (only keep positive pairs)
+        exp_logits = torch.exp(logits) * mask  # Only keep positive pairs
+        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))  # Numerator - denominator
+
+        # Compute loss for each image (maximize similarity with the correct target, minimize with others)
+        mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
+
+        # Final loss computation
+        loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
+        loss = loss.mean()
+
+        return loss
+
+
+
+
 class ETFHead(ClsHead):
     """Classification head for Baseline.
 
@@ -82,7 +135,12 @@ class ETFHead(ClsHead):
             self.eval_classes = num_classes
 
         super().__init__(*args, **kwargs)
-        self.compute_loss = DRLoss()
+        self.losses = "dr"
+        # self.losses = "supcontra"
+        if self.losses == "dr":
+            self.compute_loss = DRLoss()
+        else:
+            self.compute_loss = SupConLoss()
         assert num_classes > 0, f'num_classes={num_classes} must be a positive integer'
 
         self.num_classes = num_classes
@@ -100,31 +158,10 @@ class ETFHead(ClsHead):
         self.assignInfo = {}
         self.assignIndex = {}
 
+
+
         # self.projector = self.select_projector(512,2048,512)
         # self.classifiers = nn.Sequential()
-
-    def select_projector(self,in_dim,hidden_dim,out_dim):
-        proj_type = "proj"
-        if proj_type == "proj":
-            # projector
-            projector = nn.Sequential(
-                nn.Linear(in_dim, hidden_dim),
-                nn.ReLU(),
-                nn.Linear(hidden_dim, out_dim),
-            )
-        elif proj_type == "proj_ncfscil":
-            projector = nn.Sequential(
-                nn.Linear(self.encoder_outdim, self.encoder_outdim * 2),
-                nn.BatchNorm1d(self.encoder_outdim * 2),
-                nn.LeakyReLU(0.1),
-                nn.Linear(self.encoder_outdim * 2, self.encoder_outdim * 2),
-                nn.BatchNorm1d(self.encoder_outdim * 2),
-                nn.LeakyReLU(0.1),
-                nn.Linear(self.encoder_outdim * 2, self.proj_output_dim, bias=False),
-            )
-
-        return projector
-
 
     def norm(self, x):
         x = x / torch.norm(x, p=2, dim=1, keepdim=True)
@@ -135,7 +172,10 @@ class ETFHead(ClsHead):
 
         x = self.norm(match_vec)
         target = self.assign_target(x, gt_label)
-        losses = self.loss(x, target)
+        if self.losses == "dr":
+            losses = self.loss(x, target)
+        else:
+            losses = self.loss(x, target,gt_label)
         if self.cal_acc:
             with torch.no_grad():
                 cls_score = x @ self.etf_vec
@@ -166,6 +206,15 @@ class ETFHead(ClsHead):
         return losses
 
     def assign_target(self, source, source_labels):
+        """
+        为新类别分配target，最后返回所有类别的target
+        Args:
+            source:
+            source_labels:
+
+        Returns:
+
+        """
         # new_lb = [i for i in source_labels if self.assignInfo.get(i.item()) is None]
         new_lb = {ind: lb for ind, lb in enumerate(source_labels) if self.assignInfo.get(lb) is None}  # 字典去重
 
@@ -227,10 +276,10 @@ class ETFHead(ClsHead):
         return output
 
 
-    def loss(self, feat, target, **kwargs):
+    def loss(self, feat, target,gt_label=None):
         losses = dict()
         # compute loss
-        loss = self.compute_loss(feat, target)
+        loss = self.compute_loss(feat, target,gt_label)
         losses['loss'] = loss
         return losses
 

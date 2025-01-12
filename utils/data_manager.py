@@ -3,9 +3,7 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
-from utils.data import iCIFAR10, iCIFAR100, iImageNet100, iImageNet1000, iCIFAR224, \
-    iImageNetR,iImageNetA,CUB, objectnet, omnibenchmark, vtab, Caltech101, Food101, Flowers, \
-    Aircraft,UCF101,StanfordCars, SUN
+from utils.data import *
 import json
 
 class DataManager(object):
@@ -17,7 +15,7 @@ class DataManager(object):
         print(self._class_to_label)
         with open('./utils/templates.json', 'r') as f:
             self._data_to_prompt = json.load(f)[dataset_name]
-        print(self._data_to_prompt)
+        print("template:",self._data_to_prompt)
         
         
         self.dataset_name = dataset_name
@@ -223,8 +221,14 @@ def _get_idata(dataset_name):
         return iCIFAR224()
     elif name== "imagenetr":
         return iImageNetR()
+    elif name== "tinyimagenet":
+        return tiny_imagenet()
+    elif name== "imageneta":
+        return iImageNetA()
     elif name== "imagenet100":
         return iImageNet100()
+    elif name== "imagenetsub":
+        return iImageNetSub()
     elif name=="imageneta":
         return iImageNetA()
     elif name=="objectnet":

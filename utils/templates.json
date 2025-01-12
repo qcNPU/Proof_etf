@@ -17,6 +17,15 @@
     "art of the {}.",
     "a photo of the small {}."
     ],
+    "imagenetsub": [
+    "itap of a {}.",
+    "a bad photo of the {}.",
+    "a origami {}.",
+    "a photo of the large {}.",
+    "a {} in a video game.",
+    "art of the {}.",
+    "a photo of the small {}."
+    ],
     "food101": [
         "a photo of {}, a type of food."
     ],
@@ -54,6 +63,15 @@
         "a photo of the small {}."
     ],
     "imagenet100": [
+        "itap of a {}.",
+        "a bad photo of the {}.",
+        "a origami {}.",
+        "a photo of the large {}.",
+        "a {} in a video game.",
+        "art of the {}.",
+        "a photo of the small {}."
+    ],
+    "tinyimagenet": [
         "itap of a {}.",
         "a bad photo of the {}.",
         "a origami {}.",
@@ -158,7 +176,7 @@
         "a photo of the {}, a type of aircraft."
     ],
     "cars": [
-        "a photo of a {}.",
+        "a photo of a {}, a type of car.",
         "a photo of the {}.",
         "a photo of my {}.",
         "i love my {}!",
