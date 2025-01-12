@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
 
-def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4,visualize=True):
+def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4,visualize=False):
     # X: 输入数据集，shape 为 (N, D)，N为样本数，D为特征数
     # K: 簇的数量
     # max_iters: 最大迭代次数
@@ -66,7 +66,7 @@ def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4,visualize=True):
 
     return centroids, U
 
-def KmeansPlus(X,K):
+def KmeansPlus(X,K,visualize=False):
     # 使用 Scikit-learn 的 KMeans 类进行聚类，K-means++ 默认被启用
     kmeans = KMeans(n_clusters=K, init='k-means++', max_iter=300, n_init=10, random_state=42)
     kmeans.fit(X)
@@ -75,25 +75,26 @@ def KmeansPlus(X,K):
     centroids = kmeans.cluster_centers_  # 簇中心
     labels = kmeans.labels_  # 每个点所属簇的标签
 
-    # 使用 t-SNE 将数据降到 2D
-    tsne = TSNE(n_components=2, random_state=42, init='pca')
-    X_tsne = tsne.fit_transform(X)
-    # 可视化 t-SNE 结果
-    plt.figure(figsize=(8, 6))
+    if visualize:
+        # 使用 t-SNE 将数据降到 2D
+        tsne = TSNE(n_components=2, random_state=42, init='pca')
+        X_tsne = tsne.fit_transform(X)
+        # 可视化 t-SNE 结果
+        plt.figure(figsize=(8, 6))
 
-    # 使用不同的颜色绘制每个簇的点
-    scatter = plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap='viridis', s=50, alpha=0.7)
+        # 使用不同的颜色绘制每个簇的点
+        scatter = plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap='viridis', s=50, alpha=0.7)
 
-    # 添加颜色条
-    plt.colorbar(scatter)
+        # 添加颜色条
+        plt.colorbar(scatter)
 
-    # 设置标题
-    plt.title("K-means Clustering with t-SNE Visualization")
-    plt.xlabel("t-SNE component 1")
-    plt.ylabel("t-SNE component 2")
+        # 设置标题
+        plt.title("K-means Clustering with t-SNE Visualization")
+        plt.xlabel("t-SNE component 1")
+        plt.ylabel("t-SNE component 2")
 
-    # 显示图像
-    plt.show()
+        # 显示图像
+        plt.show()
 
     return centroids,labels
 

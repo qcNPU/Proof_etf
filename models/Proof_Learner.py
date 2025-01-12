@@ -65,12 +65,12 @@ class Learner(BaseLearner):
         for class_index in class_list:
             data_index=(label_list==class_index).nonzero().squeeze(-1)
             embedding=embedding_list[data_index]
-            if self.proto_num  == 1:
-                proto=embedding.mean(0)
-            else:
+            if "mp" in self.setting:
                 centroids,_ = KmeansPlus(embedding,self.proto_num)
                 # centroids,_ = soft_kmeans(embedding.cpu().numpy(),self.proto_num)
                 proto=torch.tensor(centroids).view(-1)
+            else:
+                proto=embedding.mean(0)
             self._network.img_prototypes[class_index]=proto
 
     def incremental_train(self, data_manager):
@@ -148,24 +148,34 @@ class Learner(BaseLearner):
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
 
                 image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
-                if self.setting == "proofetf":
+                if "nc" in self.setting:
                     # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
                     loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                    if self.proto_num >1 :
+                    if "mp" in self.setting:
                         loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po:po+1,:].squeeze(1), seen_class)["loss"] for po in range(self.proto_num)])
                     else:
                         loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     loss_etf = 10*(loss_etf1+loss_etf2)
-                if self.proto_num>1:
+                if "mp" in self.setting:
                     img_expanded = image_features.unsqueeze(1).expand(-1, proto_features.shape[1], -1).unsqueeze(1).expand(-1, proto_features.shape[0], -1, -1)  # 扩展 A 为 (64, 3, 512)
                     proto_expanded = proto_features.unsqueeze(0).expand(image_features.shape[0], -1, -1, -1)  # 扩展为 (64, 10, 3, 512)
                     # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
-                    cos_sim = F.cosine_similarity(img_expanded, proto_expanded, dim=-1)  # 输出的形状是 (64, 3)
-                    # 从每个样本中选择最大相似度的索引
-                    # max_sim_values 是相似度值，可以作为 logits，max_sim_indices 是选择的相似向量在 3 维度中的索引
-                    max_sim_values, max_sim_indices = cos_sim.max(dim=2)
-                    proto_features = proto_features[range(proto_features.shape[0]), max_sim_indices]  # 选择每个样本最相似的向量 64，10，,512
+                    cos_sim = F.cosine_similarity(img_expanded, proto_expanded, dim=-1)  # 输出的形状是 (64,10, 3)
+                    # 计算每个样本在 3 维上的最大值和最小值索引
+                    max_sim_values, max_sim_indices = cos_sim.max(dim=2)  # 获取每个样本的最大值和最大值的索引(64,10)
+                    min_sim_values, min_sim_indices = cos_sim.min(dim=2)  # 获取每个样本的最小值和最小值的索引(64,10)
+
+                    # 初始化 final_sim_indices 为最大值索引
+                    final_sim_indices = max_sim_indices.clone()
+
+                    # 单层循环，根据 target 切换目标行的选择逻辑
+                    for ind in range(cos_sim.shape[0]):
+                        target = targets[ind].item()  # 获取每个样本的 target
+                        final_sim_indices[ind, target] = min_sim_indices[ind, target]
+
+
+                    proto_features = proto_features[range(proto_features.shape[0]), final_sim_indices]  # 选择每个样本最相似的向量 64，10，,512
 
                     protoloss = F.cross_entropy((image_features.unsqueeze(1) * proto_features).sum(-1),targets)
 
@@ -182,7 +192,7 @@ class Learner(BaseLearner):
 
                 loss = F.cross_entropy(logits, targets)
 
-                if self.setting == "proofetf":
+                if "nc" in self.setting:
                     total_loss = loss+clip_loss+protoloss + loss_etf
                 else:
                     total_loss = loss+clip_loss+protoloss
@@ -229,7 +239,7 @@ class Learner(BaseLearner):
             with torch.no_grad():
                 image_features=self._network.encode_image(inputs)
                 transf_image_features, transf_text_features, _, proto_feas = self._network.forward_transformer(image_features, text_features,self._train_transformer)
-                if self.proto_num>1:
+                if "mp" in self.setting:
                     img_expanded = transf_image_features.unsqueeze(1).expand(-1, proto_feas.shape[1], -1).unsqueeze(1).expand(-1, proto_feas.shape[0], -1, -1)  # 扩展 A 为 (64, 3, 512)
                     proto_expanded = proto_feas.unsqueeze(0).expand(transf_image_features.shape[0], -1, -1, -1)  # 扩展为 (64, 10, 3, 512)
                     # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
