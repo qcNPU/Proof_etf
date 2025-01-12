@@ -70,7 +70,7 @@ class DRLoss(nn.Module):
 from pytorch_metric_learning import losses
 
 class SupConLoss(nn.Module):
-    def __init__(self, temperature=1, base_temperature=1):
+    def __init__(self, temperature=0.07, base_temperature=0.07):
         super(SupConLoss, self).__init__()
         self.temperature = temperature
         self.base_temperature = base_temperature
@@ -90,8 +90,8 @@ class SupConLoss(nn.Module):
         num_classes = etf_targets.shape[0]
 
         # Normalize features and targets (assuming already normalized)
-        features = F.normalize(features, p=2, dim=1)  # Normalize features
-        etf_targets = F.normalize(etf_targets, p=2, dim=1)  # Normalize ETF targets
+        # features = F.normalize(features, p=2, dim=1)  # Normalize features
+        # etf_targets = F.normalize(etf_targets, p=2, dim=1)  # Normalize ETF targets
 
         # Compute cosine similarity between features and targets: [batch_size, num_classes]
         similarity_matrix = torch.matmul(features, etf_targets.T) / self.temperature  # [bsz, num_classes]
@@ -104,16 +104,21 @@ class SupConLoss(nn.Module):
         logits_max, _ = torch.max(similarity_matrix, dim=1, keepdim=True)
         logits = similarity_matrix - logits_max.detach()   #去掉剪max
 
-        # Compute log probability (only keep positive pairs)
-        exp_logits = torch.exp(logits) * mask  # Only keep positive pairs
-        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))  # Numerator - denominator
+        log_prob = F.log_softmax(logits, dim=1)
 
         # Compute loss for each image (maximize similarity with the correct target, minimize with others)
         mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
-
-        # Final loss computation
         loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
         loss = loss.mean()
+
+
+        # Compute mean of log-likelihood over positive samples
+        # mean_log_prob_pos = (mask * log_prob).sum(1)
+        # mask_sum = mask.sum(1)
+        # mask_sum_mask = mask_sum > 0
+        # mean_log_prob_pos = mean_log_prob_pos[mask_sum_mask] / mask_sum[mask_sum_mask]
+        # loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
+        # loss = loss.mean()
 
         return loss
 
@@ -135,8 +140,8 @@ class ETFHead(ClsHead):
             self.eval_classes = num_classes
 
         super().__init__(*args, **kwargs)
-        self.losses = "dr"
-        # self.losses = "supcontra"
+        # self.losses = "dr"
+        self.losses = "supcontra"
         if self.losses == "dr":
             self.compute_loss = DRLoss()
         else:
