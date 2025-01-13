@@ -22,6 +22,7 @@ def setup_parser():
     parser.add_argument('--config', type=str, default='./exps/cifar.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/imgnetsub.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/imgnetr.json', help='Json file of settings.')
+    # parser.add_argument('--config', type=str, default='./exps/imgnet100.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/cub.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/car.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/air.json', help='Json file of settings.')

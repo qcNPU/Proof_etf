@@ -1,6 +1,8 @@
 {
     "prefix": "-",
-    "setting": "proofnc",
+    "setting": "proofmp",
+    "gen_proto_mode": "kmeans++",
+    "proto_num": 3,
     "dataset": "imagenetsub",
     "memory_size": 2000,
     "memory_per_class": 20,

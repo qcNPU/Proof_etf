@@ -140,8 +140,8 @@ class ETFHead(ClsHead):
             self.eval_classes = num_classes
 
         super().__init__(*args, **kwargs)
-        # self.losses = "dr"
-        self.losses = "supcontra"
+        self.losses = "dr"
+        # self.losses = "supcontra"
         if self.losses == "dr":
             self.compute_loss = DRLoss()
         else:

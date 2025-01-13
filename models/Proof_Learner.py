@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.optimize import linear_sum_assignment
-from utils.cluster import KmeansPlus,soft_kmeans
+from utils.cluster import *
 
 
 num_workers = 8
@@ -31,6 +31,8 @@ class Learner(BaseLearner):
         self.batch_size = get_attribute(args,"batch_size", 48)
         self.setting = get_attribute(args,"setting", "proof")
         self.proto_num = get_attribute(args,"proto_num", 1)
+        self.seed = get_attribute(args,"seed", 1993)
+        self.gen_proto_mode = get_attribute(args,"gen_proto_mode", "kmeans")
         self.init_lr = get_attribute(args, "init_lr", 0.01)
         self.weight_decay = get_attribute(args, "weight_decay", 0.0005)
         self.min_lr = get_attribute(args, "min_lr", 1e-8)
@@ -66,9 +68,11 @@ class Learner(BaseLearner):
             data_index=(label_list==class_index).nonzero().squeeze(-1)
             embedding=embedding_list[data_index]
             if "mp" in self.setting:
-                centroids,_ = KmeansPlus(embedding,self.proto_num)
+                centroids = gen_mc_proto(embedding,self.proto_num,self.gen_proto_mode,self.seed)
+                # centroids,_ = KmeansPlus(embedding,self.proto_num)
                 # centroids,_ = soft_kmeans(embedding.cpu().numpy(),self.proto_num)
-                proto=torch.tensor(centroids).view(-1)
+                # proto=torch.tensor(centroids).view(-1)
+                proto = centroids.view(-1)
             else:
                 proto=embedding.mean(0)
             self._network.img_prototypes[class_index]=proto
@@ -163,17 +167,16 @@ class Learner(BaseLearner):
                     # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
                     cos_sim = F.cosine_similarity(img_expanded, proto_expanded, dim=-1)  # 输出的形状是 (64,10, 3)
                     # 计算每个样本在 3 维上的最大值和最小值索引
-                    max_sim_values, max_sim_indices = cos_sim.max(dim=2)  # 获取每个样本的最大值和最大值的索引(64,10)
-                    min_sim_values, min_sim_indices = cos_sim.min(dim=2)  # 获取每个样本的最小值和最小值的索引(64,10)
-
+                    # max_sim_values, max_sim_indices = cos_sim.max(dim=2)  # 获取每个样本的最大值和最大值的索引(64,10)
+                    # min_sim_values, min_sim_indices = cos_sim.min(dim=2)  # 获取每个样本的最小值和最小值的索引(64,10)
                     # 初始化 final_sim_indices 为最大值索引
-                    final_sim_indices = max_sim_indices.clone()
-
+                    # final_sim_indices = max_sim_indices.clone()
                     # 单层循环，根据 target 切换目标行的选择逻辑
-                    for ind in range(cos_sim.shape[0]):
-                        target = targets[ind].item()  # 获取每个样本的 target
-                        final_sim_indices[ind, target] = min_sim_indices[ind, target]
+                    # for ind in range(cos_sim.shape[0]):
+                    #     target = targets[ind].item()  # 获取每个样本的 target
+                    #     final_sim_indices[ind, target] = min_sim_indices[ind, target]
 
+                    max_sim_values, final_sim_indices = cos_sim.max(dim=2)
 
                     proto_features = proto_features[range(proto_features.shape[0]), final_sim_indices]  # 选择每个样本最相似的向量 64，10，,512
 
@@ -193,6 +196,7 @@ class Learner(BaseLearner):
                 loss = F.cross_entropy(logits, targets)
 
                 if "nc" in self.setting:
+                    # print(f"loss:{loss},clip_loss:{clip_loss},protoloss:{protoloss}, loss_etf:{loss_etf}")
                     total_loss = loss+clip_loss+protoloss + loss_etf
                 else:
                     total_loss = loss+clip_loss+protoloss

@@ -1,8 +1,9 @@
 {
     "prefix": "-",
     "dataset": "food101",
-    "setting": "proofnc",
-    "proto_num": 1,
+    "setting": "proofmp",
+    "gen_proto_mode": "kmeans++",
+    "proto_num": 3,
     "num_classes": 100,
     "memory_size": 2000,
     "memory_per_class": 20,

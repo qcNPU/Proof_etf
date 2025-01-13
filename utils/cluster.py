@@ -1,12 +1,12 @@
 import numpy as np
 from scipy.spatial.distance import cdist
-from sklearn.cluster import KMeans
+from sklearn.cluster import SpectralClustering, KMeans
 import torch
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
 
-def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4,visualize=False):
+def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4,visualize=False,tempra=1.0):
     # X: 输入数据集，shape 为 (N, D)，N为样本数，D为特征数
     # K: 簇的数量
     # max_iters: 最大迭代次数
@@ -22,11 +22,18 @@ def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4,visualize=False):
 
     for iteration in range(max_iters):
         # Step 1: 计算隶属度矩阵 U
-        distances = cdist(X, centroids, 'euclidean')  # 计算每个点到所有簇中心的距离
+        # method1：
+        # distances = cdist(X, centroids, 'cosine')  # 计算每个点到所有簇中心的距离
+        # for i in range(N):
+        #     计算每个点对所有簇的隶属度
+            # U[i] = np.exp(-distances[i]**2 / (2 * sigma**2))
+            # U[i] /= np.sum(U[i])  # 归一化隶属度矩阵
+        # method2：两种方法没区别，结果一致
+        cosine_sim = np.dot(X, centroids.T) / (np.linalg.norm(X, axis=1, keepdims=True) * np.linalg.norm(centroids, axis=1))  # 计算余弦相似度
+        # 计算每个点对每个簇的隶属度
         for i in range(N):
-            # 计算每个点对所有簇的隶属度
-            U[i] = np.exp(-distances[i]**2 / (2 * sigma**2))
-            U[i] /= np.sum(U[i])  # 归一化隶属度矩阵
+            numerator = np.exp(cosine_sim[i] / tempra)  # 对每个簇的余弦相似度应用指数函数
+            U[i] = numerator / np.sum(numerator)  # 归一化隶属度矩阵
 
         # Step 2: 更新簇中心
         new_centroids = np.zeros_like(centroids)
@@ -99,23 +106,58 @@ def KmeansPlus(X,K,visualize=False):
     return centroids,labels
 
 
+def gen_mc_proto(input_data,proto_num,gen_proto_mode,seed):
+    
+    cur_proto, cur_proto_var, cur_proto_sim, cur_features = [], [], [], []
+    if gen_proto_mode == 'spectral':
+        affinity_matrix = cosine_similarity(input_data, input_data)
+        clustering = SpectralClustering(n_clusters=proto_num, assign_labels='discretize', affinity='precomputed', n_init=10, random_state=seed)
+        affinity_matrix = affinity_matrix.cpu().numpy()
+        clustering.fit_predict(affinity_matrix)
+    elif gen_proto_mode == 'kmeans':
+        clustering = KMeans(n_clusters=proto_num, random_state=seed)
+        clustering.fit(input_data.cpu().numpy())
+    elif gen_proto_mode == 'kmeans++':
+        centroids, U = KmeansPlus(input_data.cpu().numpy(), proto_num)
+        # clustering = KMeans(n_clusters=proto_num, init='k-means++', max_iter=300, n_init=10, random_state=seed)
+        # clustering.fit(input_data.cpu().numpy())
+        return torch.tensor(centroids)
+    elif gen_proto_mode == 'soft_kmeans':
+        centroids, U = soft_kmeans(input_data.cpu().numpy(), proto_num, max_iters=100, sigma=1.0, tol=1e-4)
+        return torch.tensor(centroids)
+    else:
+        raise NotImplementedError
 
-def KmeansPlus_returnfeature(X, K):#这个是将属于各个簇的特征分别放到各个list中并返回
-    clt = KMeans(n_clusters=K)
-    clt.fit(X)
-    labelIDs = np.unique(clt.labels_)
+    for label in range(proto_num):
+        feature = input_data[clustering.labels_ == label, :]
+        if not torch.is_tensor(feature):
+            feature = torch.tensor(feature).cuda()
+        var, mean = torch.var_mean(feature, dim=0)
+        cur_proto.append(mean)
+    cur_proto = torch.stack(cur_proto, dim=0)
+    return cur_proto
 
-    feature_clusters=[]
-    for labelID in labelIDs:
-        idxs = np.where(clt.labels_ == labelID)[0]
-        idxs = np.random.choice(idxs, size=min(30, len(idxs)),
-            replace=False)
-        cluster = []
-        for i in idxs:
-            cluster.append(((X[i]).squeeze(0)))
 
-        cluster1 = torch.stack(cluster,dim=0)
-        feature_clusters.append(cluster1)
+def cosine_similarity(input, target):
+    """
+    input: (dim_input, embed_dim)
+    target: (dim_ouput, embed_dim)
+    similarity: (dim_input, dim_ouput)
+    """
+    input_norm = torch.nn.functional.normalize(input, dim=1, p=2)
+    target_norm = torch.nn.functional.normalize(target, dim=1, p=2)
+    similarity = _safe_matmul(input_norm, target_norm)
+    similarity  = torch.nan_to_num(similarity)
+    eps = 1e-8
+    similarity[similarity<=eps] = eps
+    # similarity[torch.isnan(similarity)] = eps
+    return similarity
 
-    return torch.stack(feature_clusters,0)
 
+def _safe_matmul(x, y):
+    """Safe calculation of matrix multiplication.
+    If input is float16, will cast to float32 for computation and back again.
+    """
+    if x.dtype == torch.float16 or y.dtype == torch.float16:
+        return torch.matmul(x.float(), y.float().t()).half()
+    return torch.matmul(x, y.t())
