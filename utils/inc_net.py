@@ -390,12 +390,19 @@ class Proof_Net(SimpleClipNet):
 
 
     def update_prototype(self, nb_classes):
-        self.proto_dim = self.feature_dim*self.proto_num if "mp" in self.setting else self.feature_dim
-        if self.img_prototypes is not None:
-            nb_output = len(self.img_prototypes)
-            self.img_prototypes = torch.cat([copy.deepcopy(self.img_prototypes).to(self._device), torch.zeros(nb_classes - nb_output, self.proto_dim).to(self._device)]).to(self._device)
+        if "mp" in self.setting:
+            if self.img_prototypes is not None:
+                nb_output = len(self.img_prototypes)
+                self.img_prototypes = torch.cat([copy.deepcopy(self.img_prototypes).to(self._device), torch.zeros(nb_classes - nb_output, self.proto_num,self.feature_dim).to(self._device)]).to(self._device)
+            else:
+                self.img_prototypes = torch.zeros(nb_classes, self.proto_num,self.feature_dim).to(self._device)
         else:
-            self.img_prototypes = torch.zeros(nb_classes, self.proto_dim).to(self._device)
+            self.proto_dim = self.feature_dim*self.proto_num if "mp" in self.setting else self.feature_dim
+            if self.img_prototypes is not None:
+                nb_output = len(self.img_prototypes)
+                self.img_prototypes = torch.cat([copy.deepcopy(self.img_prototypes).to(self._device), torch.zeros(nb_classes - nb_output, self.proto_dim).to(self._device)]).to(self._device)
+            else:
+                self.img_prototypes = torch.zeros(nb_classes, self.proto_dim).to(self._device)
         print('update prototype, now we have {} prototypes'.format(self.img_prototypes.shape[0]))
     
     def update_context_prompt(self):
@@ -437,7 +444,8 @@ class Proof_Net(SimpleClipNet):
     def encode_prototpyes(self, normalize: bool = False):
         self.img_prototypes=self.img_prototypes.to(self._device)
         if "mp" in self.setting:
-            img_features = [self.multiproto_proj(self.img_prototypes,proj) for proj in self.projs_img]   #将prototype送入分别所有projection 层，最后在 projection 维度加和
+            # img_features = [self.multiproto_proj(self.img_prototypes,proj) for proj in self.projs_img]   #将prototype送入分别所有projection 层，最后在 projection 维度加和
+            img_features = [proj(self.img_prototypes) for proj in self.projs_img]   #将prototype送入分别所有projection 层，最后在 projection 维度加和
         else:
             img_features = [proj(self.img_prototypes) for proj in self.projs_img]
         img_features=torch.stack(img_features, dim=1)#[nb_class,num_proj,dim]
@@ -464,14 +472,15 @@ class Proof_Net(SimpleClipNet):
             raise NotImplementedError
     
     def forward_transformer(self, image_features, text_features, transformer=True,prototype_features=None):
-        prototype_features = self.encode_prototpyes(normalize=True) if prototype_features is None else prototype_features
+        prototype_features1 = self.encode_prototpyes(normalize=True) if prototype_features is None else prototype_features#10,3,512
         if transformer:
             if "mp" in self.setting:
                 context_prompts = self.get_context_prompts()
                 # restack the features and pass them through the attention layer
                 image_features = image_features.view(image_features.shape[0], -1, self.feature_dim) #[bs, 1, dim]
                 text_features = text_features.view(text_features.shape[0], self.feature_dim) #[total_classes, dim]
-                prototype_features = prototype_features.view(-1, self.feature_dim) #[len_pro, dim]30
+                prototype_features = prototype_features1.view(-1, self.feature_dim) #[len_pro, dim]30
+                # prototype_features = torch.cat(torch.unbind(prototype_features1,dim=1),dim=0) #[len_pro*3, dim] 无效
                 context_prompts = context_prompts.view(context_prompts.shape[0], self.feature_dim) #[len_con_pro, dim]
                 len_texts = text_features.shape[0]
                 len_protos = prototype_features.shape[0]

@@ -14,7 +14,7 @@ from utils.logger import get_root_logger
 from utils.toolkit import normalize
 import torch.nn.functional as F
 from .cls_head import ClsHead
-
+from utils.losses import SupConLoss
 
 def generate_random_orthogonal_matrix(feat_in, num_classes):
     """
@@ -65,64 +65,6 @@ class DRLoss(nn.Module):
         loss = 0.5 * torch.mean(((dot - (m_norm2 * h_norm2)) ** 2) / h_norm2)
 
         return loss * self.loss_weight
-
-
-from pytorch_metric_learning import losses
-
-class SupConLoss(nn.Module):
-    def __init__(self, temperature=0.07, base_temperature=0.07):
-        super(SupConLoss, self).__init__()
-        self.temperature = temperature
-        self.base_temperature = base_temperature
-        # lossss = losses.SupConLoss()
-
-    def forward(self, features, etf_targets, labels):
-        """
-        Args:
-            features: hidden vector of shape [bsz, dim], image features
-            labels: ground truth labels of shape [bsz]
-            etf_targets: target vectors of shape [num_classes, dim]
-        Returns:
-            A loss scalar.
-        """
-        device = features.device
-        batch_size = features.shape[0]
-        num_classes = etf_targets.shape[0]
-
-        # Normalize features and targets (assuming already normalized)
-        # features = F.normalize(features, p=2, dim=1)  # Normalize features
-        # etf_targets = F.normalize(etf_targets, p=2, dim=1)  # Normalize ETF targets
-
-        # Compute cosine similarity between features and targets: [batch_size, num_classes]
-        similarity_matrix = torch.matmul(features, etf_targets.T) / self.temperature  # [bsz, num_classes]
-
-        # Create a mask based on the labels, indicating the target index for each sample
-        mask = torch.zeros(batch_size, num_classes, device=device)
-        mask[torch.arange(batch_size), labels] = 1.0  # Only keep positive pairs for the correct class
-
-        # For numerical stability, subtract the max value for each row (logits normalization)
-        logits_max, _ = torch.max(similarity_matrix, dim=1, keepdim=True)
-        logits = similarity_matrix - logits_max.detach()   #去掉剪max
-
-        log_prob = F.log_softmax(logits, dim=1)
-
-        # Compute loss for each image (maximize similarity with the correct target, minimize with others)
-        mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
-        loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
-        loss = loss.mean()
-
-
-        # Compute mean of log-likelihood over positive samples
-        # mean_log_prob_pos = (mask * log_prob).sum(1)
-        # mask_sum = mask.sum(1)
-        # mask_sum_mask = mask_sum > 0
-        # mean_log_prob_pos = mean_log_prob_pos[mask_sum_mask] / mask_sum[mask_sum_mask]
-        # loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
-        # loss = loss.mean()
-
-        return loss
-
-
 
 
 class ETFHead(ClsHead):

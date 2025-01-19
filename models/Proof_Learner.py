@@ -17,6 +17,7 @@ import os
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.optimize import linear_sum_assignment
 from utils.cluster import *
+from utils.losses import *
 
 
 num_workers = 8
@@ -72,7 +73,7 @@ class Learner(BaseLearner):
                 # centroids,_ = KmeansPlus(embedding,self.proto_num)
                 # centroids,_ = soft_kmeans(embedding.cpu().numpy(),self.proto_num)
                 # proto=torch.tensor(centroids).view(-1)
-                proto = centroids.view(-1)
+                proto = centroids
             else:
                 proto=embedding.mean(0)
             self._network.img_prototypes[class_index]=proto
@@ -151,7 +152,10 @@ class Learner(BaseLearner):
                 image_features = self._network.encode_image(inputs)
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
 
-                image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer)
+                prototype_features1 = self._network.encode_prototpyes(normalize=True)
+                # if "mp" in self.setting:
+                #     sepera_loss = separation_loss_cosine(prototype_features1)
+                image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer,prototype_features=prototype_features1)
                 if "nc" in self.setting:
                     # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
                     loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
@@ -162,6 +166,7 @@ class Learner(BaseLearner):
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     loss_etf = 10*(loss_etf1+loss_etf2)
                 if "mp" in self.setting:
+                    sepera_loss = separation_loss_cosine(proto_features)
                     img_expanded = image_features.unsqueeze(1).expand(-1, proto_features.shape[1], -1).unsqueeze(1).expand(-1, proto_features.shape[0], -1, -1)  # 扩展 A 为 (64, 3, 512)
                     proto_expanded = proto_features.unsqueeze(0).expand(image_features.shape[0], -1, -1, -1)  # 扩展为 (64, 10, 3, 512)
                     # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
@@ -176,12 +181,11 @@ class Learner(BaseLearner):
                     #     target = targets[ind].item()  # 获取每个样本的 target
                     #     final_sim_indices[ind, target] = min_sim_indices[ind, target]
 
-                    max_sim_values, final_sim_indices = cos_sim.max(dim=2)
-
+                    max_sim_values, final_sim_indices = cos_sim.max(dim=2)#64，,10
                     proto_features = proto_features[range(proto_features.shape[0]), final_sim_indices]  # 选择每个样本最相似的向量 64，10，,512
-
                     protoloss = F.cross_entropy((image_features.unsqueeze(1) * proto_features).sum(-1),targets)
-
+                    # print(f"protoloss:{protoloss},seperaloss:{sepera_loss}")
+                    protoloss = protoloss+sepera_loss
                 else:
                     protoloss = F.cross_entropy(image_features @ proto_features.T, targets)
 
