@@ -1,4 +1,6 @@
 import logging
+from copy import deepcopy
+
 import numpy as np
 import torch
 from torch import nn
@@ -156,7 +158,10 @@ class Learner(BaseLearner):
                 # if "mp" in self.setting:
                 #     sepera_loss = separation_loss_cosine(prototype_features1)
                 # prototype_features1 = compute_aug_proto(image_features, prototype_features1)
-                image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer,prototype_features=prototype_features1)
+                use_multi_proto = "mp" in self.setting
+                image_features, text_features, logit_scale, proto_features = self._network.forward_transformer(
+                    img_feas, text_feas, self._train_transformer, prototype_features=prototype_features1,
+                    use_multi_proto=use_multi_proto)
                 if "nc" in self.setting:
                     # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
                     loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
@@ -168,10 +173,13 @@ class Learner(BaseLearner):
                     loss_etf = 10*(loss_etf1+loss_etf2)
                 if "mp" in self.setting:
                     sepera_loss = separation_loss_cosine(proto_features)
-                    protoloss = multiproto_max(image_features, proto_features, targets)
-
+                    # protoloss = multiproto_max(image_features, proto_features, targets)
+                    protoloss = F.cross_entropy(image_features @ proto_features[:, 0, :].squeeze(1).T, targets)
+                    protoloss += F.cross_entropy(image_features @ proto_features[:, 1, :].squeeze(1).T, targets)
+                    protoloss += F.cross_entropy(image_features @ proto_features[:, 2, :].squeeze(1).T, targets)
+                    protoloss += F.cross_entropy(image_features @ proto_features[:, 3, :].squeeze(1).T, targets)
                     # print(f"protoloss:{protoloss},seperaloss:{sepera_loss}")
-                    protoloss = protoloss+sepera_loss
+                    protoloss +=sepera_loss
                 else:
                     # proto_features = compute_aug_proto(image_features,proto_features)
                     proto_features = compute_aug_proto(text_features,proto_features)
@@ -230,13 +238,18 @@ class Learner(BaseLearner):
                 text_features.append(class_embeddings)
             text_features = torch.stack(text_features, dim=0)
 
+        use_multi_proto = True
+        if not use_multi_proto:
+            self._network.img_prototypes_co = deepcopy(self._network.img_prototypes)
+            self._network.img_prototypes = self._network.img_prototypes[:,0,:].squeeze(1)
         correct, total = 0, 0
         for i, (_, inputs, targets) in enumerate(loader):
             inputs = inputs.to(self._device)
             with torch.no_grad():
                 image_features=self._network.encode_image(inputs)
-                transf_image_features, transf_text_features, _, proto_feas = self._network.forward_transformer(image_features, text_features,self._train_transformer)
-                if "mp" in self.setting:
+                transf_image_features, transf_text_features, _, proto_feas = self._network.forward_transformer(
+                    image_features, text_features,self._train_transformer,use_multi_proto=use_multi_proto)
+                if "mp" in self.setting or use_multi_proto:
                     img_expanded = transf_image_features.unsqueeze(1).expand(-1, proto_feas.shape[1], -1).unsqueeze(1).expand(-1, proto_feas.shape[0], -1, -1)  # 扩展 A 为 (64, 3, 512)
                     proto_expanded = proto_feas.unsqueeze(0).expand(transf_image_features.shape[0], -1, -1, -1)  # 扩展为 (64, 10, 3, 512)
                     # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
@@ -247,6 +260,7 @@ class Learner(BaseLearner):
                     proto_feas = proto_feas[range(proto_feas.shape[0]), max_sim_indices]  # 选择每个样本最相似的向量 64，10，,512
 
                     proto_outputs = (transf_image_features.unsqueeze(1) * proto_feas).sum(-1)
+
                 else:
                     proto_outputs= transf_image_features @ proto_feas.T
 
@@ -257,6 +271,8 @@ class Learner(BaseLearner):
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == targets).sum()
             total += len(targets)
+        if not use_multi_proto:
+            self._network.img_prototypes = self._network.img_prototypes_co
         return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
 

@@ -471,10 +471,10 @@ class Proof_Net(SimpleClipNet):
         else:
             raise NotImplementedError
     
-    def forward_transformer(self, image_features, text_features, transformer=True,prototype_features=None):
+    def forward_transformer(self, image_features, text_features, transformer=True,prototype_features=None,use_multi_proto=True):
         prototype_features = self.encode_prototpyes(normalize=True) if prototype_features is None else prototype_features#10,3,512
         if transformer:
-            if "mp" in self.setting:
+            if use_multi_proto:
                 context_prompts = self.get_context_prompts()
                 # restack the features and pass them through the attention layer
                 image_features = image_features.view(image_features.shape[0], -1, self.feature_dim) #[bs, 1, dim]
