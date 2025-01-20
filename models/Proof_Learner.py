@@ -155,6 +155,7 @@ class Learner(BaseLearner):
                 prototype_features1 = self._network.encode_prototpyes(normalize=True)
                 # if "mp" in self.setting:
                 #     sepera_loss = separation_loss_cosine(prototype_features1)
+                # prototype_features1 = compute_aug_proto(image_features, prototype_features1)
                 image_features, text_features, logit_scale, proto_features=self._network.forward_transformer(img_feas, text_feas,self._train_transformer,prototype_features=prototype_features1)
                 if "nc" in self.setting:
                     # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
@@ -167,26 +168,13 @@ class Learner(BaseLearner):
                     loss_etf = 10*(loss_etf1+loss_etf2)
                 if "mp" in self.setting:
                     sepera_loss = separation_loss_cosine(proto_features)
-                    img_expanded = image_features.unsqueeze(1).expand(-1, proto_features.shape[1], -1).unsqueeze(1).expand(-1, proto_features.shape[0], -1, -1)  # 扩展 A 为 (64, 3, 512)
-                    proto_expanded = proto_features.unsqueeze(0).expand(image_features.shape[0], -1, -1, -1)  # 扩展为 (64, 10, 3, 512)
-                    # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
-                    cos_sim = F.cosine_similarity(img_expanded, proto_expanded, dim=-1)  # 输出的形状是 (64,10, 3)
-                    # 计算每个样本在 3 维上的最大值和最小值索引
-                    # max_sim_values, max_sim_indices = cos_sim.max(dim=2)  # 获取每个样本的最大值和最大值的索引(64,10)
-                    # min_sim_values, min_sim_indices = cos_sim.min(dim=2)  # 获取每个样本的最小值和最小值的索引(64,10)
-                    # 初始化 final_sim_indices 为最大值索引
-                    # final_sim_indices = max_sim_indices.clone()
-                    # 单层循环，根据 target 切换目标行的选择逻辑
-                    # for ind in range(cos_sim.shape[0]):
-                    #     target = targets[ind].item()  # 获取每个样本的 target
-                    #     final_sim_indices[ind, target] = min_sim_indices[ind, target]
+                    protoloss = multiproto_max(image_features, proto_features, targets)
 
-                    max_sim_values, final_sim_indices = cos_sim.max(dim=2)#64，,10
-                    proto_features = proto_features[range(proto_features.shape[0]), final_sim_indices]  # 选择每个样本最相似的向量 64，10，,512
-                    protoloss = F.cross_entropy((image_features.unsqueeze(1) * proto_features).sum(-1),targets)
                     # print(f"protoloss:{protoloss},seperaloss:{sepera_loss}")
                     protoloss = protoloss+sepera_loss
                 else:
+                    # proto_features = compute_aug_proto(image_features,proto_features)
+                    proto_features = compute_aug_proto(text_features,proto_features)
                     protoloss = F.cross_entropy(image_features @ proto_features.T, targets)
 
                 logits = image_features@text_features.T # [bs, allclasses]
@@ -203,6 +191,7 @@ class Learner(BaseLearner):
                     # print(f"loss:{loss},clip_loss:{clip_loss},protoloss:{protoloss}, loss_etf:{loss_etf}")
                     total_loss = loss+clip_loss+protoloss + loss_etf
                 else:
+                    # print(f"loss:{loss},clip_loss:{clip_loss},protoloss:{protoloss}")
                     total_loss = loss+clip_loss+protoloss
 
                 optimizer.zero_grad()
