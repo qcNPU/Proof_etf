@@ -166,20 +166,20 @@ class Learner(BaseLearner):
                     # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
                     loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     if "mp" in self.setting:
-                        loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po:po+1,:].squeeze(1), seen_class)["loss"] for po in range(self.proto_num)])
+                        loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po,:].squeeze(1), seen_class)["loss"] for po in range(self.proto_num)])
+                        # loss_etf2 = self._network.eft_head.forward_train_v1(proto_features.mean(1), seen_class)["loss"]
                     else:
                         loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     loss_etf = 10*(loss_etf1+loss_etf2)
                 if "mp" in self.setting:
-                    sepera_loss = separation_loss_cosine(proto_features)
+                    # sepera_loss = separation_loss_cosine(proto_features)
                     # protoloss = multiproto_max(image_features, proto_features, targets)
+                    # protoloss +=sepera_loss
                     protoloss = F.cross_entropy(image_features @ proto_features[:, 0, :].squeeze(1).T, targets)
                     protoloss += F.cross_entropy(image_features @ proto_features[:, 1, :].squeeze(1).T, targets)
                     protoloss += F.cross_entropy(image_features @ proto_features[:, 2, :].squeeze(1).T, targets)
                     protoloss += F.cross_entropy(image_features @ proto_features[:, 3, :].squeeze(1).T, targets)
-                    # print(f"protoloss:{protoloss},seperaloss:{sepera_loss}")
-                    protoloss +=sepera_loss
                 else:
                     # proto_features = compute_aug_proto(image_features,proto_features)
                     proto_features = compute_aug_proto(text_features,proto_features)

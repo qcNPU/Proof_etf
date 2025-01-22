@@ -1,8 +1,8 @@
 {
     "prefix": "-",
-    "setting": "proof",
+    "setting": "proofncmp",
     "gen_proto_mode": "kmeans++",
-    "proto_num": 3,
+    "proto_num": 4,
     "dataset": "tinyimagenet",
     "memory_size": 4000,
     "memory_per_class": 20,
