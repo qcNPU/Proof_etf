@@ -33,6 +33,7 @@ class Learner(BaseLearner):
 
         self.batch_size = get_attribute(args,"batch_size", 48)
         self.setting = get_attribute(args,"setting", "proof")
+        self.increment = get_attribute(args,"increment", 10)
         self.proto_num = get_attribute(args,"proto_num", 1)
         self.seed = get_attribute(args,"seed", 1993)
         self.gen_proto_mode = get_attribute(args,"gen_proto_mode", "kmeans")
@@ -72,9 +73,6 @@ class Learner(BaseLearner):
             embedding=embedding_list[data_index]
             if "mp" in self.setting:
                 centroids = gen_mc_proto(embedding,self.proto_num,self.gen_proto_mode,self.seed)
-                # centroids,_ = KmeansPlus(embedding,self.proto_num)
-                # centroids,_ = soft_kmeans(embedding.cpu().numpy(),self.proto_num)
-                # proto=torch.tensor(centroids).view(-1)
                 proto = centroids
             else:
                 proto=embedding.mean(0)
@@ -108,11 +106,11 @@ class Learner(BaseLearner):
             self._network = nn.DataParallel(self._network, self._multiple_gpus)
         #  先送入预训练 image encoder 计算 新 task 的 class prototype，不经过 projection 层
         self.cal_prototype(self.train_loader_for_protonet, self._network)
-        acc = self._train_proj(self.train_loader, self.test_loader, self.train_loader_for_protonet)
+        acc,task_acc = self._train_proj(self.train_loader, self.test_loader, self.train_loader_for_protonet)
         self.build_rehearsal_memory(data_manager, self.samples_per_class)
         if len(self._multiple_gpus) > 1:
             self._network = self._network.module
-        return acc
+        return acc,task_acc
 
     def _train_proj(self, train_loader, test_loader, train_loader_for_protonet):
         self._train_transformer=True
@@ -173,13 +171,14 @@ class Learner(BaseLearner):
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     loss_etf = 10*(loss_etf1+loss_etf2)
                 if "mp" in self.setting:
-                    # sepera_loss = separation_loss_cosine(proto_features)
-                    # protoloss = multiproto_max(image_features, proto_features, targets)
-                    # protoloss +=sepera_loss
-                    protoloss = F.cross_entropy(image_features @ proto_features[:, 0, :].squeeze(1).T, targets)
-                    protoloss += F.cross_entropy(image_features @ proto_features[:, 1, :].squeeze(1).T, targets)
-                    protoloss += F.cross_entropy(image_features @ proto_features[:, 2, :].squeeze(1).T, targets)
-                    protoloss += F.cross_entropy(image_features @ proto_features[:, 3, :].squeeze(1).T, targets)
+                    sepera_loss = separation_loss_cosine_2(proto_features)
+                    protoloss = multiproto_max(image_features, proto_features, targets)
+                    protoloss +=sepera_loss
+                    # protoloss = F.cross_entropy(image_features @ proto_features[:, 0, :].squeeze(1).T, targets)
+                    # protoloss += F.cross_entropy(image_features @ proto_features[:, 1, :].squeeze(1).T, targets)
+                    # protoloss += F.cross_entropy(image_features @ proto_features[:, 2, :].squeeze(1).T, targets)
+                    # protoloss += F.cross_entropy(image_features @ proto_features[:, 3, :].squeeze(1).T, targets)
+                    # protoloss += sepera_loss
                 else:
                     # proto_features = compute_aug_proto(image_features,proto_features)
                     proto_features = compute_aug_proto(text_features,proto_features)
@@ -213,13 +212,13 @@ class Learner(BaseLearner):
 
             scheduler.step()
             train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
-            test_acc = self._compute_accuracy(self._network, test_loader)
+            test_acc ,task_acc= self._compute_accuracy(self._network, test_loader)
             info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_acc {:.2f}, Test_acc {:.2f}".format(
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
             # prog_bar.set_description(info)
             print(info)
         self._network.eft_head.clear_assignment(self._total_classes)
-        return test_acc
+        return test_acc,task_acc
 
     def _compute_accuracy(self, model, loader):# 只计算 top1
         self._network.eval()
@@ -238,11 +237,14 @@ class Learner(BaseLearner):
                 text_features.append(class_embeddings)
             text_features = torch.stack(text_features, dim=0)
 
-        use_multi_proto = True
-        if not use_multi_proto:
-            self._network.img_prototypes_co = deepcopy(self._network.img_prototypes)
-            self._network.img_prototypes = self._network.img_prototypes[:,0,:].squeeze(1)
+        # use_multi_proto = True
+        use_multi_proto = "mp" in self.setting
+        # if not use_multi_proto:     #这个是给有多个prototype但是test时只用一个的setting使用的
+        #     self._network.img_prototypes_co = deepcopy(self._network.img_prototypes)
+        #     self._network.img_prototypes = self._network.img_prototypes[:,0,:].squeeze(1)
         correct, total = 0, 0
+        task_correct = {}
+        task_total = {}
         for i, (_, inputs, targets) in enumerate(loader):
             inputs = inputs.to(self._device)
             with torch.no_grad():
@@ -271,9 +273,29 @@ class Learner(BaseLearner):
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == targets).sum()
             total += len(targets)
-        if not use_multi_proto:
-            self._network.img_prototypes = self._network.img_prototypes_co
-        return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
+
+            tasks = targets // self.increment
+            # 遍历当前 batch 中所有 task（去重）
+            for task in tasks.unique():
+                # 构造 mask，筛选出属于当前 task 的样本
+                mask = (tasks == task)
+                # 累计该 task 中的正确预测数
+                correct_t = (predicts.cpu()[mask] == targets[mask]).sum().item()
+                total_t = mask.sum().item()
+
+                task = int(task.item())  # 转为 Python int
+                task_correct[task] = task_correct.get(task, 0) + correct_t
+                task_total[task] = task_total.get(task, 0) + total_t
+
+        # 计算每个 task 的准确率，按照 task 编号升序排列
+        task_accuracies = []
+        for task in sorted(task_total.keys()):
+            acc = task_correct[task] / task_total[task]
+            task_accuracies.append(acc)
+        task_accuracies = [np.around(accru*100, decimals=2) for accru in task_accuracies]
+        # if not use_multi_proto:
+        #     self._network.img_prototypes = self._network.img_prototypes_co
+        return np.around(tensor2numpy(correct) * 100 / total, decimals=2),task_accuracies
 
 
     def _eval_cnn(self, loader):#会计算topK

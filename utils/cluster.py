@@ -73,9 +73,9 @@ def soft_kmeans(X, K, max_iters=100, sigma=1.0, tol=1e-4,visualize=False,tempra=
 
     return centroids, U
 
-def KmeansPlus(X,K,visualize=False):
+def KmeansPlus(X,K,visualize=False,seed=42):
     # 使用 Scikit-learn 的 KMeans 类进行聚类，K-means++ 默认被启用
-    kmeans = KMeans(n_clusters=K, init='k-means++', max_iter=300, n_init=10, random_state=42)
+    kmeans = KMeans(n_clusters=K, init='k-means++', max_iter=300, n_init='auto', random_state=seed)
     kmeans.fit(X)
 
     # 获取簇中心和标签
@@ -84,7 +84,7 @@ def KmeansPlus(X,K,visualize=False):
 
     if visualize:
         # 使用 t-SNE 将数据降到 2D
-        tsne = TSNE(n_components=2, random_state=42, init='pca')
+        tsne = TSNE(n_components=2, random_state=seed, init='pca')
         X_tsne = tsne.fit_transform(X)
         # 可视化 t-SNE 结果
         plt.figure(figsize=(8, 6))
@@ -111,16 +111,15 @@ def gen_mc_proto(input_data,proto_num,gen_proto_mode,seed):
     cur_proto, cur_proto_var, cur_proto_sim, cur_features = [], [], [], []
     if gen_proto_mode == 'spectral':
         affinity_matrix = cosine_similarity(input_data, input_data)
-        clustering = SpectralClustering(n_clusters=proto_num, assign_labels='discretize', affinity='precomputed', n_init=10, random_state=seed)
+        clustering = SpectralClustering(n_clusters=proto_num, assign_labels='discretize', affinity='precomputed', n_init='auto', random_state=seed)
         affinity_matrix = affinity_matrix.cpu().numpy()
         clustering.fit_predict(affinity_matrix)
     elif gen_proto_mode == 'kmeans':
         clustering = KMeans(n_clusters=proto_num, random_state=seed)
         clustering.fit(input_data.cpu().numpy())
     elif gen_proto_mode == 'kmeans++':
-        centroids, U = KmeansPlus(input_data.cpu().numpy(), proto_num)
-        # clustering = KMeans(n_clusters=proto_num, init='k-means++', max_iter=300, n_init=10, random_state=seed)
-        # clustering.fit(input_data.cpu().numpy())
+        centroids, U = KmeansPlus(input_data.cpu().numpy(), proto_num,visualize=False,seed=seed)
+        # centroids, U = KmeansPlus(input_data.cpu().numpy(), proto_num,visualize=False)
         return torch.tensor(centroids)
     elif gen_proto_mode == 'soft_kmeans':
         centroids, U = soft_kmeans(input_data.cpu().numpy(), proto_num, max_iters=100, sigma=1.0, tol=1e-4)

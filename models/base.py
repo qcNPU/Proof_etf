@@ -75,7 +75,7 @@ class BaseLearner(object):
         grouped = accuracy(y_pred.T[0], y_true, nb_old=self._known_classes)#total是所有seen class 的准确率
         ret["grouped"] = grouped
         ret["top1"] = grouped["total"]
-        ret["top{}".format(self.topk)] = np.around((y_pred.T == np.tile(y_true, (self.topk, 1))).sum() * 100 / len(y_true),decimals=2)
+        # ret["top{}".format(self.topk)] = np.around((y_pred.T == np.tile(y_true, (self.topk, 1))).sum() * 100 / len(y_true),decimals=2)
         return ret
     
     def _evaluate_zs(self, y_pred, y_true):

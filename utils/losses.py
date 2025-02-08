@@ -2,7 +2,43 @@ import torch
 import torch.nn.functional as F
 from .toolkit import *
 import numpy as np
-def separation_loss_cosine(proto_features):
+
+
+def separation_loss_cosine_2(proto_features):
+    """
+    计算每个类别的3个prototype之间的分离损失，使用 F.cosine_similarity。
+    通过向量化操作优化掉 for 循环。
+
+    Args:
+        proto_features: [num_classes, 3, feature_dim]，每个类别有3个prototype。
+
+    Returns:
+        loss: 分离损失值。
+    """
+    num_classes, num_prototypes, feature_dim = proto_features.shape
+
+    # 计算所有类别的相似度矩阵
+    # 使用 F.cosine_similarity 计算 pairwise 余弦相似度
+    sim_matrix = F.cosine_similarity(
+        proto_features.unsqueeze(2),  # shape: [num_classes, 3, 1, feature_dim]
+        proto_features.unsqueeze(1),  # shape: [num_classes, 1, 3, feature_dim]
+        dim=-1
+    )  # shape: [num_classes, 3, 3]
+
+    # 创建掩码，屏蔽自身相似度（对角线）和重复计算（上三角部分）
+    mask = torch.triu(torch.ones(num_prototypes, num_prototypes, device=proto_features.device), diagonal=1).bool()  # shape: [3, 3]
+    mask = mask.unsqueeze(0).expand(num_classes, -1, -1)  # shape: [num_classes, 3, 3]
+
+    # 提取上三角部分的相似度
+    sim_matrix = sim_matrix[mask]  # shape: [num_classes * 3]
+
+    # 计算损失：最小化相似度的平均值
+    loss = -sim_matrix.mean()
+
+    return loss
+
+
+def separation_loss_cosine_1(proto_features):
     """
     计算每个类别的3个prototype之间的分离损失，使用余弦相似度。
     proto_features: [num_classes, 3, feature_dim]，每个类别有3个prototype。
@@ -23,9 +59,8 @@ def separation_loss_cosine(proto_features):
         # 只取上三角部分的相似度
         sim_matrix = sim_matrix[mask]
 
-        # 为了使原型间尽量不同，我们需要最小化相似度的总和
-        # 注意：这里我们取负值是因为优化器默认是求最小值，而我们希望相似度尽可能小
         loss += -sim_matrix.mean()
+        # loss += sim_matrix.mean()
 
     # 平均每个类别的损失
     loss /= num_classes
@@ -136,7 +171,7 @@ def compute_aug_proto(features, prototypes, gamma=None):
 
     return proto_aug
 
-
+#尝试将这个supcontrast loss应用到多prototype上，以前是应用在etf target上
 class SupConLoss(nn.Module):
     def __init__(self, temperature=0.07, base_temperature=0.07):
         super(SupConLoss, self).__init__()

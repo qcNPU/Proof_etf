@@ -31,6 +31,36 @@ def normalize(x):
     return x
 
 
+def compute_task_accuracies(predicts, targets,max_class, task_size=10):
+    """
+    predicts: torch.Tensor，预测的类别标签，例如 shape = (N,)
+    targets: torch.Tensor，真实标签，例如 shape = (N,)
+    task_size: 每个 task 包含的类别数量，默认是 10
+
+    返回：
+        一个 list，其中每个元素为对应 task 的准确率
+    """
+    # 计算总的任务数，假设类别从 0 开始连续编号
+    num_tasks = (max_class // task_size) + 1
+
+    task_accuracies = []
+    for task in range(num_tasks):
+        lower_bound = task * task_size
+        upper_bound = (task + 1) * task_size
+        # 选取属于当前 task 的样本：真实标签在 [lower_bound, upper_bound)
+        mask = (targets >= lower_bound) & (targets < upper_bound)
+        total = mask.sum().item()
+        if total == 0:
+            # 如果当前 task 没有样本，可以选择跳过或者设为 0
+            acc = 0.0
+        else:
+            correct = (predicts[mask] == targets[mask]).sum().item()
+            acc = correct / total
+        task_accuracies.append(acc)
+
+    return task_accuracies
+
+
 def accuracy(y_pred, y_true, nb_old, increment=10):
     assert len(y_pred) == len(y_true), "Data length error."
     all_acc = {}
