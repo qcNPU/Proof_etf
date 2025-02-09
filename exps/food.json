@@ -1,7 +1,7 @@
 {
     "prefix": "-",
     "dataset": "food101",
-    "setting": "proofncmp",
+    "setting": "proof",
     "gen_proto_mode": "kmeans++",
     "proto_num": 4,
     "num_classes": 100,
