@@ -553,6 +553,7 @@ class Proof_Net(SimpleClipNet):
     
     
     def freeze_projection_weight_new(self):
+        # print("freeze old projs_text")
         if len(self.projs_img)>1:
             for i in range(len(self.projs_img)):
                 for param in self.projs_img[i].parameters():
@@ -563,8 +564,7 @@ class Proof_Net(SimpleClipNet):
                 param.requires_grad = True
         for param in self.sel_attn.parameters():
             param.requires_grad = True
-        # for param in self.eft_head.projector.parameters():
-        #     param.requires_grad = True
+
 
     def forward(self, image, text):
         image_features = self.encode_image(image, normalize=True)#bs,dim

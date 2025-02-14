@@ -192,8 +192,8 @@ class SupConLoss(nn.Module):
         num_classes = etf_targets.shape[0]
 
         # Normalize features and targets (assuming already normalized)
-        # features = F.normalize(features, p=2, dim=1)  # Normalize features
-        # etf_targets = F.normalize(etf_targets, p=2, dim=1)  # Normalize ETF targets
+        features = F.normalize(features, p=2, dim=1)  # Normalize features
+        etf_targets = F.normalize(etf_targets, p=2, dim=1)  # Normalize ETF targets
 
         # Compute cosine similarity between features and targets: [batch_size, num_classes]
         similarity_matrix = torch.matmul(features, etf_targets.T) / self.temperature  # [bsz, num_classes]
@@ -243,3 +243,59 @@ def separation_loss(proto_features):
     loss /= num_classes
 
     return loss
+
+
+
+class SupConLossMultiProto(nn.Module):
+    def __init__(self, temperature=0.07, base_temperature=0.07):
+        super(SupConLossMultiProto, self).__init__()
+        self.temperature = temperature
+        self.base_temperature = base_temperature
+
+    def forward(self, features, multi_prototypes, labels):
+        """
+        Args:
+            features: Tensor of shape [batch_size, feature_dim]，图像特征。
+            multi_prototypes: Tensor of shape [num_classes, num_prototypes, feature_dim]，
+                              每个类别对应多个prototype。
+            labels: Tensor of shape [batch_size]，每个样本对应的ground truth类别索引。
+        Returns:
+            loss: 标量损失值。
+        """
+        device = features.device
+        batch_size = features.shape[0]
+        num_classes, num_prototypes, feature_dim = multi_prototypes.shape
+
+        # 对图像特征和prototype做归一化处理（假设归一化是基于 L2 范数）
+        features = F.normalize(features, p=2, dim=1)  # [batch_size, feature_dim]
+        multi_prototypes = F.normalize(multi_prototypes, p=2, dim=2)  # [num_classes, num_prototypes, feature_dim]
+
+        # 将多prototype矩阵展平为 [num_classes * num_prototypes, feature_dim]
+        flat_prototypes = multi_prototypes.view(num_classes * num_prototypes, feature_dim)
+
+        # 计算图像特征与所有prototype之间的余弦相似度，结果 shape 为 [batch_size, num_classes * num_prototypes]
+        similarity_matrix = torch.matmul(features, flat_prototypes.T) / self.temperature
+
+        # 构造mask：对于每个样本，将其 ground truth 类别对应的所有prototype设置为正样本（1），其他为负样本（0）
+        # 每个样本的正样本对应的索引为: [cls * num_prototypes, cls * num_prototypes + num_prototypes)
+        mask = torch.zeros(batch_size, num_classes * num_prototypes, device=device)
+        for i in range(batch_size):
+            cls = labels[i].item()  # 当前样本的类别索引
+            start_idx = cls * num_prototypes
+            end_idx = start_idx + num_prototypes
+            mask[i, start_idx:end_idx] = 1.0
+
+        # 为数值稳定性，对每行 logits 做最大值归一化
+        logits_max, _ = torch.max(similarity_matrix, dim=1, keepdim=True)
+        logits = similarity_matrix - logits_max.detach()
+
+        # 计算每行的 log_softmax
+        log_prob = F.log_softmax(logits, dim=1)
+
+        # 对每个样本，仅保留正样本部分的log概率，并求均值
+        positive_log_prob = (mask * log_prob).sum(dim=1) / mask.sum(dim=1)
+
+        # 最终损失为负的正样本平均对数似然，再乘以温度比（可选）
+        loss = - (self.temperature / self.base_temperature) * positive_log_prob
+        loss = loss.mean()
+        return loss

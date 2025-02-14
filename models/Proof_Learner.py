@@ -31,13 +31,13 @@ class Learner(BaseLearner):
         self._train_transformer=False
         self._network = Proof_Net(args, False)
 
-        self.batch_size = get_attribute(args,"batch_size", 48)
+        self.batch_size = get_attribute(args,"batch_size", 64)
         self.setting = get_attribute(args,"setting", "proof")
         self.increment = get_attribute(args,"increment", 10)
-        self.proto_num = get_attribute(args,"proto_num", 1)
+        self.proto_num = get_attribute(args,"proto_num", 4)
         self.seed = get_attribute(args,"seed", 1993)
-        self.gen_proto_mode = get_attribute(args,"gen_proto_mode", "kmeans")
-        self.init_lr = get_attribute(args, "init_lr", 0.01)
+        self.gen_proto_mode = get_attribute(args,"gen_proto_mode", "kmeans++")
+        self.init_lr = get_attribute(args, "init_lr", 0.02)
         self.weight_decay = get_attribute(args, "weight_decay", 0.0005)
         self.min_lr = get_attribute(args, "min_lr", 1e-8)
         self.frozen_layers = get_attribute(args, "frozen_layers", None)
@@ -170,7 +170,14 @@ class Learner(BaseLearner):
                         loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     loss_etf = 10*(loss_etf1+loss_etf2)
-                if "mp" in self.setting:
+
+                if "scmp" in self.setting: #supcontrast loss
+                    suploss = SupConLossMultiProto()
+                    protoloss = 3*suploss(image_features,proto_features,targets)
+                elif "sc" in self.setting: #supcontrast loss
+                    suploss = SupConLoss()
+                    protoloss = 3*suploss(image_features,proto_features,targets)
+                elif "mp" in self.setting:
                     sepera_loss = separation_loss_cosine_2(proto_features)
                     protoloss = multiproto_max(image_features, proto_features, targets)
                     protoloss +=sepera_loss
@@ -181,7 +188,7 @@ class Learner(BaseLearner):
                     # protoloss += sepera_loss
                 else:
                     # proto_features = compute_aug_proto(image_features,proto_features)
-                    proto_features = compute_aug_proto(text_features,proto_features)
+                    # proto_features = compute_aug_proto(text_features,proto_features)
                     protoloss = F.cross_entropy(image_features @ proto_features.T, targets)
 
                 logits = image_features@text_features.T # [bs, allclasses]
