@@ -80,6 +80,17 @@ def multiproto_max(image_features,proto_features,targets):
     return protoloss
 
 
+def get_similar_proto(image_features,proto_features):
+    img_expanded = image_features.unsqueeze(1).expand(-1, proto_features.shape[1], -1).unsqueeze(1).expand(-1, proto_features.shape[0], -1, -1)  # 扩展 A 为 (64, 3, 512)
+    proto_expanded = proto_features.unsqueeze(0).expand(image_features.shape[0], -1, -1, -1)  # 扩展为 (64, 10, 3, 512)
+    # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
+    cos_sim = F.cosine_similarity(img_expanded, proto_expanded, dim=-1)  # 输出的形状是 (64,10, 3)
+
+    max_sim_values, final_sim_indices = cos_sim.max(dim=2)  # 64，,10
+    proto_features = proto_features[range(proto_features.shape[0]), final_sim_indices]  # 选择每个样本最相似的向量 64，10，,512
+    return proto_features
+
+
 # 计算原型之间的余弦相似度矩阵
 def compute_similarity_matrix(prototypes):
     """
@@ -216,6 +227,49 @@ class SupConLoss(nn.Module):
         return loss
 
 
+class Suploss_batchproto(nn.Module):
+    def __init__(self, temperature=0.07, base_temperature=0.07):
+        super(Suploss_batchproto, self).__init__()
+        self.temperature = temperature
+        self.base_temperature = base_temperature
+
+    def forward(self, features, prototypes, labels):
+        """
+        Args:
+            features: (batch, dim) 图像特征
+            prototypes: (batch, num_classes, dim) 每个样本在所有类别中最相似的 prototype
+            labels: (batch,) 样本的 ground truth labels
+
+        Returns:
+            A scalar loss value.
+        """
+        device = features.device
+        batch_size, num_classes, dim = prototypes.shape
+
+        # Normalize features and prototypes
+        features = F.normalize(features, p=2, dim=1)  # (batch, dim)
+        prototypes = F.normalize(prototypes, p=2, dim=2)  # (batch, num_classes, dim)
+
+        # Compute cosine similarity between features and prototypes: (batch, num_classes)    (batch, num_classes,dim)(batch,dim,1)
+        similarity_matrix = torch.bmm(prototypes, features.unsqueeze(2)).squeeze(2) / self.temperature  # (batch, num_classes)
+
+        # Create a mask for positive samples based on labels
+        mask = torch.zeros(batch_size, num_classes, device=device)
+        mask[torch.arange(batch_size), labels] = 1.0  # 仅标记正确类别为 positive
+
+        # Logits normalization for numerical stability
+        logits_max, _ = torch.max(similarity_matrix, dim=1, keepdim=True)
+        logits = similarity_matrix - logits_max.detach()  # 防止数值不稳定
+
+        # Compute log probabilities
+        log_prob = F.log_softmax(logits, dim=1)
+
+        # Compute loss: maximize similarity with positive class, minimize others
+        mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
+        loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
+        loss = loss.mean()
+
+        return loss
 
 
 def separation_loss(proto_features):

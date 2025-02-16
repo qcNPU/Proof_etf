@@ -172,8 +172,11 @@ class Learner(BaseLearner):
                     loss_etf = 10*(loss_etf1+loss_etf2)
 
                 if "scmp" in self.setting: #supcontrast loss
-                    suploss = SupConLossMultiProto()
-                    protoloss = 3*suploss(image_features,proto_features,targets)
+                    # suploss = SupConLossMultiProto()  #这个效果不如SupConLoss， 尝试多prototype选择最好的，然后用下面的单prototype
+                    # protoloss = suploss(image_features,proto_features,targets)
+                    proto_features = get_similar_proto(image_features,proto_features)
+                    suploss = Suploss_batchproto()
+                    protoloss = 3 * suploss(image_features, proto_features, targets)
                 elif "sc" in self.setting: #supcontrast loss
                     suploss = SupConLoss()
                     protoloss = 3*suploss(image_features,proto_features,targets)

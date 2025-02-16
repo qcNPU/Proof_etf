@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -52,6 +54,11 @@ class ScaledDotProductAttention(nn.Module):
         return output, attn, log_attn
 
 
+class QuickGELU(nn.Module):
+    def forward(self, x: torch.Tensor):
+        return x * torch.sigmoid(1.702 * x)
+
+
 class MultiHeadAttention(nn.Module):
     ''' Multi-Head Attention module '''
 
@@ -70,6 +77,12 @@ class MultiHeadAttention(nn.Module):
 
         self.attention = ScaledDotProductAttention(temperature=np.power(d_k, 0.5))
         self.layer_norm = nn.LayerNorm(d_model)
+
+        # self.mlp = nn.Sequential(OrderedDict([
+        #     ("c_fc", nn.Linear(n_head * d_v, d_model * 4)),
+        #     ("gelu", QuickGELU()),
+        #     ("c_proj", nn.Linear(d_model * 4, d_model))
+        # ]))
 
         self.fc = nn.Linear(n_head * d_v, d_model)
         nn.init.xavier_normal_(self.fc.weight)
