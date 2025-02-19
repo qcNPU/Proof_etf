@@ -29,7 +29,7 @@ def train(args):
     ABmean,ABstd = np.mean(AB_results),np.std(AB_results)
     formean,forstd = np.mean(for_results),np.std(for_results)
 
-    print(f"10 seed,A_:{A_mean:.2f}±{A_std:.2f},results={A_results},,\n"
+    print(f"A_:{A_mean:.2f}±{A_std:.2f},results={A_results},\n"
           f"AB:{ABmean:.2f}±{ABstd:.2f},results={AB_results},\n"
           f"forget:{formean:.2f}±{forstd:.2f}, results={for_results}")
 
@@ -66,7 +66,7 @@ def _train(args):
         print(
             "Trainable params: {}".format(count_parameters(model._network, True))
         )
-        acc,task_acc = model.incremental_train(data_manager)
+        acc,task_acc = model.incremental_train(data_manager)  #acc是总正确/总数取2位小数；task_acc是每个task训练完后在所有seen task上的准确率
         acc_history.append(task_acc)
         # cnn_accy, nme_accy = model.eval_task()
         # cnn_accy, nme_accy, zs_seen, zs_unseen, zs_harmonic, zs_total = model.eval_task()
@@ -77,7 +77,7 @@ def _train(args):
         #
         cnn_curve["top1"].append(acc)
         print("pertask acc_history:", acc_history)
-        print("mean pertask:",cnn_curve["top1"],", final avg:",sum(cnn_curve["top1"])/len(cnn_curve["top1"]))
+        print("afterTask mean:",cnn_curve["top1"],", final avg:",sum(cnn_curve["top1"])/len(cnn_curve["top1"]))
         # cnn_curve["top1"].append(cnn_accy["top1"])
         # cnn_curve["top5"].append(cnn_accy["top5"])
         #
@@ -87,9 +87,9 @@ def _train(args):
         # print('Average Accuracy (CNN):', sum(cnn_curve["top1"])/len(cnn_curve["top1"]))
         # print("Average Accuracy (CNN): {}".format(sum(cnn_curve["top1"])/len(cnn_curve["top1"])))
 
-    forgetting_rates, avg_forgetting = compute_forgetting_rates(acc_history)
-    print("all finish,forgetting pertask:",forgetting_rates,",avg_forgetting",avg_forgetting)
-    return np.mean(cnn_curve["top1"]),cnn_curve["top1"][-1],avg_forgetting
+    # forgetting_rates, avg_forgetting = compute_forgetting_rates(acc_history)
+    # print("final forgetting pertask:",forgetting_rates,",avg_forgetting",avg_forgetting)
+    return np.mean(cnn_curve["top1"]),cnn_curve["top1"][-1],0
 
 
 def compute_forgetting_rates(acc_history):

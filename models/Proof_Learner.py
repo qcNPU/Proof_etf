@@ -293,16 +293,16 @@ class Learner(BaseLearner):
                 correct_t = (predicts.cpu()[mask] == targets[mask]).sum().item()
                 total_t = mask.sum().item()
 
-                task = int(task.item())  # 转为 Python int
-                task_correct[task] = task_correct.get(task, 0) + correct_t
-                task_total[task] = task_total.get(task, 0) + total_t
+                taskNo = int(task.item())  # 转为 Python int
+                task_correct[taskNo] = task_correct.get(taskNo, 0) + correct_t
+                task_total[taskNo] = task_total.get(taskNo, 0) + total_t
 
         # 计算每个 task 的准确率，按照 task 编号升序排列
         task_accuracies = []
         for task in sorted(task_total.keys()):
             acc = task_correct[task] / task_total[task]
-            task_accuracies.append(acc)
-        task_accuracies = [np.around(accru*100, decimals=2) for accru in task_accuracies]
+            task_accuracies.append([acc, task_correct[task] , task_total[task]])
+        # task_accuracies = [np.around(accru*100, decimals=2) for accru in task_accuracies]
         # if not use_multi_proto:
         #     self._network.img_prototypes = self._network.img_prototypes_co
         return np.around(tensor2numpy(correct) * 100 / total, decimals=2),task_accuracies
