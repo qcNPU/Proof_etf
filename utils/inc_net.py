@@ -1,13 +1,14 @@
 import copy
-import logging
+
 import torch
-from torch import nn
-from convs.linears import SimpleLinear, SplitCosineLinear, CosineLinear
-import timm
 import torch.nn.functional as F
+from torch import nn
+
+from convs.linears import SimpleLinear, SplitCosineLinear, CosineLinear
 from convs.projections import Proj_Pure_MLP, MultiHeadAttention, Proj_MLP
-from utils.toolkit import get_attribute
 from models.ETFHead import ETFHead
+from utils.toolkit import get_attribute
+
 
 def get_convnet(args, pretrained=False):
 
@@ -384,7 +385,8 @@ class Proof_Net(SimpleClipNet):
         self.setting = get_attribute(args, "setting", "proof")
         self.sel_attn = MultiHeadAttention(1, self.feature_dim, self.feature_dim, self.feature_dim, dropout=0.1)
         self.img_prototypes = None
-        self.eft_head = ETFHead(self.num_classes, self.feature_dim,self._device)
+        if "nc" in self.setting:
+            self.eft_head = ETFHead(self.num_classes, self.feature_dim,self._device)
 
         self.context_prompts = nn.ParameterList()
 

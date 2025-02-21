@@ -1,7 +1,6 @@
-import torch
-import torch.nn.functional as F
-from .toolkit import *
 import numpy as np
+
+from .toolkit import *
 
 
 def separation_loss_cosine_2(proto_features):

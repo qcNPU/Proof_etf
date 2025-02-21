@@ -1,20 +1,16 @@
-from copy import deepcopy
 from typing import Dict
 
 import math
 import numpy as np
 import torch
-import torch.distributed as dist
 import torch.nn as nn
-from mmcv.runner import get_dist_info
+import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics.pairwise import cosine_similarity
 
-from utils.logger import get_root_logger
-from utils.toolkit import normalize
-import torch.nn.functional as F
-from .cls_head import ClsHead
 from utils.losses import SupConLoss
+from .cls_head import ClsHead
+
 
 def generate_random_orthogonal_matrix(feat_in, num_classes):
     """
@@ -93,8 +89,8 @@ class ETFHead(ClsHead):
         self.num_classes = num_classes
         self.in_channels = in_channels
         self.device = device
-        logger = get_root_logger()
-        logger.info("ETF head : evaluating {} out of {} classes.".format(self.eval_classes, self.num_classes))
+        # logger = get_root_logger()
+        # logger.info("ETF head : evaluating {} out of {} classes.".format(self.eval_classes, self.num_classes))
 
         orth_vec = generate_random_orthogonal_matrix(self.in_channels, self.num_classes)
         i_nc_nc = torch.eye(self.num_classes)
@@ -240,19 +236,19 @@ class ETFHead(ClsHead):
         else:
             return cls_score
 
-    @staticmethod
-    def produce_training_rect(label: torch.Tensor, num_classes: int):
-        rank, world_size = get_dist_info()
-        if world_size > 0:
-            recv_list = [None for _ in range(world_size)]
-            dist.all_gather_object(recv_list, label.cpu())
-            new_label = torch.cat(recv_list).to(device=label.device)
-            label = new_label
-        uni_label, count = torch.unique(label, return_counts=True)
-        batch_size = label.size(0)
-        uni_label_num = uni_label.size(0)
-        assert batch_size == torch.sum(count)
-        gamma = torch.tensor(batch_size / uni_label_num, device=label.device, dtype=torch.float32)
-        rect = torch.ones(1, num_classes).to(device=label.device, dtype=torch.float32)
-        rect[0, uni_label] = torch.sqrt(gamma / count)
-        return rect
+    # @staticmethod
+    # def produce_training_rect(label: torch.Tensor, num_classes: int):
+    #     rank, world_size = get_dist_info()
+    #     if world_size > 0:
+    #         recv_list = [None for _ in range(world_size)]
+    #         dist.all_gather_object(recv_list, label.cpu())
+    #         new_label = torch.cat(recv_list).to(device=label.device)
+    #         label = new_label
+    #     uni_label, count = torch.unique(label, return_counts=True)
+    #     batch_size = label.size(0)
+    #     uni_label_num = uni_label.size(0)
+    #     assert batch_size == torch.sum(count)
+    #     gamma = torch.tensor(batch_size / uni_label_num, device=label.device, dtype=torch.float32)
+    #     rect = torch.ones(1, num_classes).to(device=label.device, dtype=torch.float32)
+    #     rect[0, uni_label] = torch.sqrt(gamma / count)
+    #     return rect

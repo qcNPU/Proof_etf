@@ -1,10 +1,11 @@
-import logging
-import numpy as np
+from PIL import Image
+import json
+
 from PIL import Image
 from torch.utils.data import Dataset
-from torchvision import transforms
+
 from utils.data import *
-import json
+
 
 class DataManager(object):
     def __init__(self, dataset_name, shuffle, seed, init_cls, increment):

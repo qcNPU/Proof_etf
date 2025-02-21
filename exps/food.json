@@ -1,7 +1,7 @@
 {
     "prefix": "-",
     "dataset": "food101",
-    "setting": "proofsc",
+    "setting": "proof",
     "gen_proto_mode": "kmeans++",
     "proto_num": 4,
     "num_classes": 100,
@@ -14,7 +14,7 @@
     "model_name": "proof",
     "convnet_type": "clip",
     "device": [ "2"],
-    "seed": [1993],
+    "seed":  [7,999],
     "projection_type": "pure_mlp",
     "frozen_layers": "visual",
     "tuned_epoch": 10,

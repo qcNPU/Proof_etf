@@ -52,6 +52,7 @@ def _train(args):
     )
 
     _set_random(args["seed"])
+    # _set_random(1)#默认就是1 todo 把1的跑一遍
     _set_device(args)
     print_args(args)
     data_manager = DataManager(args["dataset"],args["shuffle"],args["seed"],args["init_cls"],args["increment"], )

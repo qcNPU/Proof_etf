@@ -1,8 +1,7 @@
-import numpy as np
-from scipy.spatial.distance import cdist
-from sklearn.cluster import SpectralClustering, KMeans
-import torch
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from sklearn.cluster import SpectralClustering, KMeans
 from sklearn.manifold import TSNE
 
 

@@ -42,7 +42,7 @@ class iCIFAR100(iData):
 
 def build_transform(is_train, args):
     input_size = 224
-    t=[  
+    t=[
         transforms.Resize((224,224),transforms.InterpolationMode.BICUBIC),
         transforms.CenterCrop(size=(224, 224)),
         transforms.ToTensor(),
@@ -50,6 +50,30 @@ def build_transform(is_train, args):
         # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]
     return t
+
+def build_usual_transform(is_train, args):
+    train_trsf=build_transform(True, None)
+    test_trsf=build_transform(False, None)
+    common_trsf = []
+    return train_trsf,test_trsf,common_trsf
+
+
+def build_imagenet_transform(is_train, args):
+    train_trsf = [
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+    ]
+    test_trsf = [
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+    ]
+    common_trsf = [
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
+    return train_trsf, test_trsf, common_trsf
+
+
 
 
 class iImageNet100(iData):
@@ -82,11 +106,13 @@ class iImageNet100(iData):
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
 
 
+
+
+
 class iImageNetSub(iData):
     use_path = True
-    train_trsf=build_transform(True, None)
-    test_trsf=build_transform(False, None)
-    common_trsf = []
+    train_trsf,test_trsf,common_trsf = build_usual_transform(None,None)
+    # train_trsf,test_trsf,common_trsf = build_imagenet_transform(None,None)
 
     class_order = np.arange(100).tolist()
 
@@ -94,7 +120,6 @@ class iImageNetSub(iData):
         # assert 0, "You should specify the folder of your dataset"
         train_dir = "/home/qc/dataset/seed_1993_subset_100_imagenet/data/train/"
         test_dir = "/home/qc/dataset/seed_1993_subset_100_imagenet/data/val/"
-        from datasets import load_dataset
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -108,9 +133,8 @@ class iImageNetSub(iData):
 class iImageNetR(iData):
     use_path = True
     
-    train_trsf=build_transform(True, None)
-    test_trsf=build_transform(False, None)
-    common_trsf = [    ]
+    train_trsf,test_trsf,common_trsf = build_usual_transform(None,None)
+    # train_trsf,test_trsf,common_trsf = build_imagenet_transform(None,None)
 
     class_order = np.arange(200).tolist()
 
@@ -132,9 +156,8 @@ class iImageNetR(iData):
 class tiny_imagenet(iData):
     use_path = True
 
-    train_trsf = build_transform(True, None)
-    test_trsf = build_transform(False, None)
-    common_trsf = []
+    train_trsf,test_trsf,common_trsf = build_usual_transform(None,None)
+    # train_trsf, test_trsf, common_trsf = build_imagenet_transform(None, None)
 
     class_order = np.arange(200).tolist()
 

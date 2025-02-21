@@ -32,11 +32,28 @@ def setup_parser():
 
 import numpy as np
 def getmeanstd():
-    AB_results =[77.89,77.83,78.91,77.74,77.38,78.85,77.86,78.53,77.79,78.45]
-    ABmean,ABstd = np.mean(AB_results),np.std(AB_results)
+    avg_results =[87.9,87.52,87.49]
+    # avg_results = [avg_results[i] for i in [0,1,3]]
+    # avg_results = [avg_results[i] for i in [1,2,8]]
+    A_mean,A_std = np.mean(avg_results),np.std(avg_results)
+    print(f"{A_mean:.2f}±{A_std:.2f}")
+    last_results =[81.15,81.49, 80.39]
+    # last_results = [last_results[i] for i in [0,1,3]]
+    # last_results = [last_results[i] for i in [1,2,8]]
+    ABmean,ABstd = np.mean(last_results),np.std(last_results)
     print(f"{ABmean:.2f}±{ABstd:.2f}")
 
 
+
+def getSub():
+    AB_1 = [81.11, 81.62, 81.48, 81.0, 81.5, 81.01, 81.08, 81.45, 81.4, 81.57]
+    AB_2 = [77.27, 77.72, 78.43, 77.3, 77.35, 78.59, 77.36, 77.68, 77.4, 78.01]
+    c = [i-j for (i,j) in zip(AB_1,AB_2)]
+    print(f"{c}")
+
+
 if __name__ == '__main__':
+    # print("proofncscmp 类名空格")
     main()
     # getmeanstd()
+    # getSub()

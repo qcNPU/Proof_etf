@@ -1,26 +1,11 @@
-import logging
-from copy import deepcopy
-
-import numpy as np
-import torch
-from torch import nn
-from torch.serialization import load
-from tqdm import tqdm
 from torch import optim
-from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from utils.inc_net import  Proof_Net
-from models.base import BaseLearner
-from utils.toolkit import tensor2numpy, get_attribute, ClipLoss,normalize
-from utils.data_manager import LaionData
-import math
-import matplotlib.pyplot as plt
-import os
-from sklearn.metrics.pairwise import cosine_similarity
-from scipy.optimize import linear_sum_assignment
-from utils.cluster import *
-from utils.losses import *
+from tqdm import tqdm
 
+from models.base import BaseLearner
+from utils.cluster import *
+from utils.inc_net import Proof_Net
+from utils.losses import *
 
 num_workers = 8
 class Learner(BaseLearner):
@@ -43,6 +28,8 @@ class Learner(BaseLearner):
         self.frozen_layers = get_attribute(args, "frozen_layers", None)
 
         self.tuned_epoch = get_attribute(args, "tuned_epoch", 5)
+        self.ncloss = get_attribute(args, "ncloss", 10)
+        self.scmploss = get_attribute(args, "scmploss", 3)
 
         self._known_classes = 0
 
@@ -169,17 +156,17 @@ class Learner(BaseLearner):
                     else:
                         loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
-                    loss_etf = 10*(loss_etf1+loss_etf2)
+                    loss_etf = self.ncloss*(loss_etf1+loss_etf2)
 
                 if "scmp" in self.setting: #supcontrast loss
                     # suploss = SupConLossMultiProto()  #这个效果不如SupConLoss， 尝试多prototype选择最好的，然后用下面的单prototype
                     # protoloss = suploss(image_features,proto_features,targets)
                     proto_features = get_similar_proto(image_features,proto_features)
                     suploss = Suploss_batchproto()
-                    protoloss = 3 * suploss(image_features, proto_features, targets)
+                    protoloss = self.scmploss * suploss(image_features, proto_features, targets)
                 elif "sc" in self.setting: #supcontrast loss
                     suploss = SupConLoss()
-                    protoloss = 3*suploss(image_features,proto_features,targets)
+                    protoloss = self.scmploss*suploss(image_features,proto_features,targets)
                 elif "mp" in self.setting:
                     sepera_loss = separation_loss_cosine_2(proto_features)
                     protoloss = multiproto_max(image_features, proto_features, targets)
@@ -227,7 +214,8 @@ class Learner(BaseLearner):
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
             # prog_bar.set_description(info)
             print(info)
-        self._network.eft_head.clear_assignment(self._total_classes)
+        if "nc" in self.setting:
+            self._network.eft_head.clear_assignment(self._total_classes)
         return test_acc,task_acc
 
     def _compute_accuracy(self, model, loader):# 只计算 top1
