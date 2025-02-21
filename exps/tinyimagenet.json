@@ -3,6 +3,8 @@
     "setting": "proofnc",
     "gen_proto_mode": "kmeans++",
     "proto_num": 4,
+    "ncloss": 10,
+    "scmploss": 3,
     "dataset": "tinyimagenet",
     "memory_size": 4000,
     "memory_per_class": 20,

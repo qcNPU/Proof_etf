@@ -2,7 +2,8 @@ import numpy as np
 from torchvision import datasets, transforms
 from utils.toolkit import split_images_labels
 
-
+# root_dir = "/home/qc/dataset"
+root_dir = "/root/autodl-tmp"
 class iData(object):
     train_trsf = []
     test_trsf = []
@@ -30,8 +31,9 @@ class iCIFAR100(iData):
     class_order = np.arange(100).tolist()
 
     def download_data(self):
-        train_dataset = datasets.cifar.CIFAR100("./data", train=True, download=True)
-        test_dataset = datasets.cifar.CIFAR100("./data", train=False, download=True)
+        self.root_dir =root_dir
+        train_dataset = datasets.cifar.CIFAR100(root=self.root_dir, train=True, download=True)
+        test_dataset = datasets.cifar.CIFAR100(root=self.root_dir, train=False, download=True)
         self.train_data, self.train_targets = train_dataset.data, np.array(
             train_dataset.targets
         )
@@ -95,8 +97,8 @@ class iImageNet100(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/home/qc/dataset/Imagenet100/train/"
-        test_dir = "/home/qc/dataset/Imagenet100/val/"
+        train_dir = root_dir + "/Imagenet100/train/"
+        test_dir = root_dir + "/Imagenet100/val/"
         from datasets import load_dataset
 
         train_dset = datasets.ImageFolder(train_dir)
@@ -118,8 +120,8 @@ class iImageNetSub(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/home/qc/dataset/seed_1993_subset_100_imagenet/data/train/"
-        test_dir = "/home/qc/dataset/seed_1993_subset_100_imagenet/data/val/"
+        train_dir = root_dir + "/seed_1993_subset_100_imagenet/data/train/"
+        test_dir = root_dir + "/seed_1993_subset_100_imagenet/data/val/"
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -140,8 +142,8 @@ class iImageNetR(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/home/qc/dataset/imagenetr/train"
-        test_dir = "/home/qc/dataset/imagenetr/test"
+        train_dir = root_dir + "/imagenetr/train"
+        test_dir = root_dir + "/imagenetr/test"
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -163,8 +165,8 @@ class tiny_imagenet(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/home/qc/dataset/tiny-imagenet-200/train"
-        test_dir = "/home/qc/dataset/tiny-imagenet-200/val"
+        train_dir = root_dir + "/tiny-imagenet-200/train"
+        test_dir = root_dir + "/tiny-imagenet-200/val"
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -210,8 +212,8 @@ class CUB(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/home/qc/dataset/cub/train/"
-        test_dir = "/home/qc/dataset/cub/test/"
+        train_dir = root_dir + "/cub/train/"
+        test_dir = root_dir + "/cub/test/"
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -254,8 +256,8 @@ class Food101(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/home/qc/dataset/food101/train/"
-        test_dir = "/home/qc/dataset/food101/test/"
+        train_dir = root_dir + "/food101/train/"
+        test_dir = root_dir + "/food101/test/"
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -298,8 +300,8 @@ class Aircraft(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/home/qc/dataset/aircraft/train/"
-        test_dir = "/home/qc/dataset/aircraft/test/"
+        train_dir = root_dir + "/aircraft/train/"
+        test_dir = root_dir + "/aircraft/test/"
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -342,8 +344,8 @@ class StanfordCars(iData):
 
     def download_data(self):
         # assert 0, "You should specify the folder of your dataset"
-        train_dir = "/home/qc/dataset/cars/train/"
-        test_dir = "/home/qc/dataset/cars/test/"
+        train_dir = root_dir + "/cars/train/"
+        test_dir = root_dir + "/cars/test/"
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
@@ -482,7 +484,7 @@ class iCIFAR224(iData):
     class_order = np.arange(100).tolist()
 
     def download_data(self):
-        self.root_dir = "/home/qc/dataset"
+        self.root_dir = root_dir
         train_dataset = datasets.cifar.CIFAR100(root=self.root_dir, train=True, download=True)
         test_dataset = datasets.cifar.CIFAR100(root=self.root_dir, train=False, download=True)
         self.train_data, self.train_targets = train_dataset.data, np.array(

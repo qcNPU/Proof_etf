@@ -4,6 +4,8 @@
     "setting": "proof",
     "gen_proto_mode": "kmeans++",
     "proto_num": 4,
+    "ncloss": 10,
+    "scmploss": 3,
     "num_classes": 100,
     "memory_size": 2000,
     "memory_per_class": 20,

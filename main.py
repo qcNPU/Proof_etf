@@ -32,12 +32,12 @@ def setup_parser():
 
 import numpy as np
 def getmeanstd():
-    avg_results =[87.9,87.52,87.49]
+    avg_results =[87.9,86.69,86.54]
     # avg_results = [avg_results[i] for i in [0,1,3]]
     # avg_results = [avg_results[i] for i in [1,2,8]]
     A_mean,A_std = np.mean(avg_results),np.std(avg_results)
     print(f"{A_mean:.2f}±{A_std:.2f}")
-    last_results =[81.15,81.49, 80.39]
+    last_results =[79.13,80.76, 81.15]
     # last_results = [last_results[i] for i in [0,1,3]]
     # last_results = [last_results[i] for i in [1,2,8]]
     ABmean,ABstd = np.mean(last_results),np.std(last_results)
@@ -53,7 +53,6 @@ def getSub():
 
 
 if __name__ == '__main__':
-    # print("proofncscmp 类名空格")
     main()
     # getmeanstd()
     # getSub()
