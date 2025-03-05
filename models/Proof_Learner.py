@@ -18,6 +18,7 @@ class Learner(BaseLearner):
 
         self.batch_size = get_attribute(args,"batch_size", 64)
         self.setting = get_attribute(args,"setting", "proof")
+        self.train_templates = get_attribute(args,"train_templates", "one")
         self.increment = get_attribute(args,"increment", 10)
         self.proto_num = get_attribute(args,"proto_num", 4)
         self.seed = get_attribute(args,"seed", 1993)
@@ -116,7 +117,10 @@ class Learner(BaseLearner):
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args['tuned_epoch'], eta_min=self.min_lr)
 
         class_to_label = self.data_manager._class_to_label
-        templates = self.data_manager._data_to_prompt[0]
+        if self.train_templates == "one":
+            templates = self.data_manager._data_to_prompt[0]
+        else:
+            templates = self.data_manager._data_to_prompt
         prog_bar = tqdm(range(self.tuned_epoch))
         cliploss = ClipLoss()
         total_cls_names = class_to_label[:self._total_classes] # mask all known classes
@@ -131,10 +135,13 @@ class Learner(BaseLearner):
                 inputs = inputs.to(self._device)
                 targets = targets.to(self._device)
 
-                texts = [templates.format(inst) for inst in total_cls_names]
-                texts = self._network.tokenizer(texts).to(self._device)
-                text_features = self._network.encode_text(texts) # [total_classes, dim]
-                text_feas = text_features / text_features.norm(dim=-1, keepdim=True)
+                if self.train_templates == "one":
+                    texts = [templates.format(inst) for inst in total_cls_names]
+                    texts = self._network.tokenizer(texts).to(self._device)
+                    text_features = self._network.encode_text(texts) # [total_classes, dim]
+                    text_feas = text_features / text_features.norm(dim=-1, keepdim=True)
+                else:
+                    text_feas = self.use_templates_mean(total_cls_names,templates)
 
                 image_features = self._network.encode_image(inputs)
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
@@ -183,9 +190,12 @@ class Learner(BaseLearner):
 
                 logits = image_features@text_features.T # [bs, allclasses]
 
-                texts=[templates.format(inst) for inst in cls_names]
-                clip_text_feas=self._network.encode_text(self._network.tokenizer(texts).to(self._device))#total,dim
-                clip_text_feas = clip_text_feas / clip_text_feas.norm(dim=-1, keepdim=True)
+                if self.train_templates == "one":
+                    texts=[templates.format(inst) for inst in cls_names]
+                    clip_text_feas=self._network.encode_text(self._network.tokenizer(texts).to(self._device))#total,dim
+                    clip_text_feas = clip_text_feas / clip_text_feas.norm(dim=-1, keepdim=True)
+                else:
+                    clip_text_feas = self.use_templates_mean(cls_names,templates)
 
                 clip_loss = cliploss(img_feas, clip_text_feas, logit_scale)  # 这个loss有效
 
@@ -218,6 +228,59 @@ class Learner(BaseLearner):
             self._network.eft_head.clear_assignment(self._total_classes)
         return test_acc,task_acc
 
+
+    def use_templates_mean(self,total_cls_names,templates):
+
+        # text_features = []
+        # for l in total_cls_names:
+        #     texts = [t.format(l) for t in templates]
+        #     texts = self._network.tokenizer(texts).to(self._device)
+        #     class_embeddings = self._network.encode_text(texts)
+        #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+        #     class_embeddings = class_embeddings.mean(dim=0)
+        #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+        #     text_features.append(class_embeddings)
+        # text_feas = torch.stack(text_features, dim=0)
+
+        # clip_text_features = []
+        # for l in cls_names:
+        #     texts = [t.format(l) for t in templates]
+        #     texts = self._network.tokenizer(texts).to(self._device)
+        #     class_embeddings = self._network.encode_text(texts)
+        #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+        #     class_embeddings = class_embeddings.mean(dim=0)
+        #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+        #     clip_text_features.append(class_embeddings)
+        # clip_text_feas = torch.stack(clip_text_features, dim=0)
+
+        #下面的代码是上面代码的高效改进版
+        # 批量生成所有类别和模板的组合文本
+        texts = [
+            t.format(cls_name)
+            for cls_name in total_cls_names
+            for t in templates
+        ]
+
+        # 批量进行tokenize和文本编码（避免循环内重复调用）
+        tokenized_texts = self._network.tokenizer(texts).to(self._device)
+        all_embeddings = self._network.encode_text(tokenized_texts)  # [num_classes * num_templates, dim]
+
+        # 对每个嵌入向量进行归一化（合并两次归一化为一次）
+        all_embeddings = torch.nn.functional.normalize(all_embeddings, dim=-1)  # [num_classes * num_templates, dim]
+
+        # 重组为三维张量并计算均值
+        text_feas = all_embeddings.view(
+            len(total_cls_names),
+            len(templates),
+            -1
+        ).mean(dim=1)  # [num_classes, dim]
+
+        # 对最终结果进行整体归一化
+        text_feas = torch.nn.functional.normalize(text_feas, dim=-1)
+
+        return text_feas
+
+
     def _compute_accuracy(self, model, loader):# 只计算 top1
         self._network.eval()
         class_to_label = self.data_manager._class_to_label
@@ -225,15 +288,16 @@ class Learner(BaseLearner):
         total_labels = class_to_label[:self._total_classes] # mask all known classes
         text_features = []
         with torch.no_grad():
-            for l in total_labels:
-                texts = [t.format(l) for t in templates]
-                texts = self._network.tokenizer(texts).to(self._device)
-                class_embeddings = self._network.encode_text(texts)
-                class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
-                class_embeddings = class_embeddings.mean(dim=0)
-                class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
-                text_features.append(class_embeddings)
-            text_features = torch.stack(text_features, dim=0)
+            # for l in total_labels:
+            #     texts = [t.format(l) for t in templates]
+            #     texts = self._network.tokenizer(texts).to(self._device)
+            #     class_embeddings = self._network.encode_text(texts)
+            #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+            #     class_embeddings = class_embeddings.mean(dim=0)
+            #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+            #     text_features.append(class_embeddings)
+            # text_features = torch.stack(text_features, dim=0)
+            text_features = self.use_templates_mean(total_labels,templates)  #这里本来就是用所有的  ,这个写法跟上面的代码效果完全一样
 
         # use_multi_proto = True
         use_multi_proto = "mp" in self.setting

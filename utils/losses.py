@@ -232,7 +232,7 @@ class Suploss_batchproto(nn.Module):
         self.temperature = temperature
         self.base_temperature = base_temperature
 
-    def forward(self, features, prototypes, labels):
+    def forward(self, features, prototypes, labels):   #这个类的对比损失是每个图片都选了10个prototype继续对比损失
         """
         Args:
             features: (batch, dim) 图像特征

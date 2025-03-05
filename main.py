@@ -20,10 +20,10 @@ def load_json(settings_path):
 def setup_parser():
     parser = argparse.ArgumentParser(description='Reproduce of multiple continual learning algorthms.')
     # parser.add_argument('--config', type=str, default='./exps/cifar.json', help='Json file of settings.')
-    parser.add_argument('--config', type=str, default='./exps/imgnetr.json', help='Json file of settings.')
+    # parser.add_argument('--config', type=str, default='./exps/imgnetr.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/imgnet100.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/tinyimagenet.json', help='Json file of settings.')
-    # parser.add_argument('--config', type=str, default='./exps/food.json', help='Json file of settings.')
+    parser.add_argument('--config', type=str, default='./exps/food.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/imgnetsub.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/cub.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/car.json', help='Json file of settings.')
@@ -32,15 +32,17 @@ def setup_parser():
 
 import numpy as np
 def getmeanstd():
-    avg_results =[87.9,86.69,86.54]
+    avg_results =[94.349, 94.748, 93.301]
     # avg_results = [avg_results[i] for i in [0,1,3]]
     # avg_results = [avg_results[i] for i in [1,2,8]]
     A_mean,A_std = np.mean(avg_results),np.std(avg_results)
     print(f"{A_mean:.2f}±{A_std:.2f}")
-    last_results =[79.13,80.76, 81.15]
+    # print(f"{A_mean}±{A_std}")
+    last_results =[90.64, 90.88, 90.72]
     # last_results = [last_results[i] for i in [0,1,3]]
     # last_results = [last_results[i] for i in [1,2,8]]
     ABmean,ABstd = np.mean(last_results),np.std(last_results)
+    # print(f"{ABmean}±{ABstd}")
     print(f"{ABmean:.2f}±{ABstd:.2f}")
 
 
