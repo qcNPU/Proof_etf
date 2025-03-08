@@ -231,16 +231,16 @@ class Learner(BaseLearner):
 
     def use_templates_mean(self,total_cls_names,templates):
 
-        # text_features = []
-        # for l in total_cls_names:
-        #     texts = [t.format(l) for t in templates]
-        #     texts = self._network.tokenizer(texts).to(self._device)
-        #     class_embeddings = self._network.encode_text(texts)
-        #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
-        #     class_embeddings = class_embeddings.mean(dim=0)
-        #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
-        #     text_features.append(class_embeddings)
-        # text_feas = torch.stack(text_features, dim=0)
+        text_features = []
+        for l in total_cls_names:
+            texts = [t.format(l) for t in templates]
+            texts = self._network.tokenizer(texts).to(self._device)
+            class_embeddings = self._network.encode_text(texts)
+            class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+            class_embeddings = class_embeddings.mean(dim=0)
+            class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+            text_features.append(class_embeddings)
+        text_feas = torch.stack(text_features, dim=0)
 
         # clip_text_features = []
         # for l in cls_names:
@@ -253,30 +253,26 @@ class Learner(BaseLearner):
         #     clip_text_features.append(class_embeddings)
         # clip_text_feas = torch.stack(clip_text_features, dim=0)
 
-        #下面的代码是上面代码的高效改进版
+        #下面的代码是上面代码的高效改进版   但是内存占用会不断飙升
         # 批量生成所有类别和模板的组合文本
-        texts = [
-            t.format(cls_name)
-            for cls_name in total_cls_names
-            for t in templates
-        ]
-
-        # 批量进行tokenize和文本编码（避免循环内重复调用）
-        tokenized_texts = self._network.tokenizer(texts).to(self._device)
-        all_embeddings = self._network.encode_text(tokenized_texts)  # [num_classes * num_templates, dim]
-
-        # 对每个嵌入向量进行归一化（合并两次归一化为一次）
-        all_embeddings = torch.nn.functional.normalize(all_embeddings, dim=-1)  # [num_classes * num_templates, dim]
-
-        # 重组为三维张量并计算均值
-        text_feas = all_embeddings.view(
-            len(total_cls_names),
-            len(templates),
-            -1
-        ).mean(dim=1)  # [num_classes, dim]
-
-        # 对最终结果进行整体归一化
-        text_feas = torch.nn.functional.normalize(text_feas, dim=-1)
+        # texts = [t.format(cls_name) for cls_name in total_cls_names for t in templates]
+        #
+        # # 批量进行tokenize和文本编码（避免循环内重复调用）
+        # tokenized_texts = self._network.tokenizer(texts).to(self._device)
+        # all_embeddings = self._network.encode_text(tokenized_texts)  # [num_classes * num_templates, dim]
+        #
+        # # 对每个嵌入向量进行归一化（合并两次归一化为一次）
+        # all_embeddings = torch.nn.functional.normalize(all_embeddings, dim=-1)  # [num_classes * num_templates, dim]
+        #
+        # # 重组为三维张量并计算均值
+        # text_feas = all_embeddings.view(
+        #     len(total_cls_names),
+        #     len(templates),
+        #     -1
+        # ).mean(dim=1)  # [num_classes, dim]
+        #
+        # # 对最终结果进行整体归一化
+        # text_feas = torch.nn.functional.normalize(text_feas, dim=-1)
 
         return text_feas
 
@@ -288,16 +284,16 @@ class Learner(BaseLearner):
         total_labels = class_to_label[:self._total_classes] # mask all known classes
         text_features = []
         with torch.no_grad():
-            # for l in total_labels:
-            #     texts = [t.format(l) for t in templates]
-            #     texts = self._network.tokenizer(texts).to(self._device)
-            #     class_embeddings = self._network.encode_text(texts)
-            #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
-            #     class_embeddings = class_embeddings.mean(dim=0)
-            #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
-            #     text_features.append(class_embeddings)
-            # text_features = torch.stack(text_features, dim=0)
-            text_features = self.use_templates_mean(total_labels,templates)  #这里本来就是用所有的  ,这个写法跟上面的代码效果完全一样
+            for l in total_labels:
+                texts = [t.format(l) for t in templates]
+                texts = self._network.tokenizer(texts).to(self._device)
+                class_embeddings = self._network.encode_text(texts)
+                class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+                class_embeddings = class_embeddings.mean(dim=0)
+                class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+                text_features.append(class_embeddings)
+            text_features = torch.stack(text_features, dim=0)
+            # text_features = self.use_templates_mean(total_labels,templates)  #这里本来就是用所有的  ,这个写法跟上面的代码效果完全一样，但是内存占用会不断飙升
 
         # use_multi_proto = True
         use_multi_proto = "mp" in self.setting

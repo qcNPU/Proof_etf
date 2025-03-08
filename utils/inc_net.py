@@ -19,7 +19,7 @@ def get_convnet(args, pretrained=False):
         import open_clip
         if backbone_name == 'clip':
             model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', pretrained='laion400m_e32')
-            tokenizer = open_clip.tokenize
+            tokenizer = open_clip.get_tokenizer('ViT-B-16')
             model.out_dim = 512
             return model, preprocess, tokenizer
         elif backbone_name=='clip_laion2b':
@@ -29,7 +29,7 @@ def get_convnet(args, pretrained=False):
             return model, preprocess, tokenizer
         elif backbone_name=='openai_clip':
             model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', pretrained='openai')
-            tokenizer = open_clip.tokenize
+            tokenizer = open_clip.get_tokenizer('ViT-B-16')
             model.out_dim = 512
             return model, preprocess, tokenizer
         else:
