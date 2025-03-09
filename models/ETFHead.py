@@ -71,13 +71,14 @@ class ETFHead(ClsHead):
         in_channels (int): Number of channels in the input feature map.
     """
 
-    def __init__(self, num_classes: int, in_channels: int,device, *args, **kwargs) -> None:
+    def __init__(self, num_classes: int, in_channels: int,device,target_choose, *args, **kwargs) -> None:
         if kwargs.get('eval_classes', None):
             self.eval_classes = kwargs.pop('eval_classes')
         else:
             self.eval_classes = num_classes
 
         super().__init__(*args, **kwargs)
+        self.target_choose =target_choose
         self.losses = "dr"
         # self.losses = "supcontra"
         if self.losses == "dr":
@@ -180,11 +181,12 @@ class ETFHead(ClsHead):
                 self.assignInfo[label] = self.etf_vec[col_ind[i]].view(-1, self.in_channels)  # 把 value 直接变成向量
                 self.assignIndex[label] = col_ind[i]  # 先存着后面用
 
-            # Remove from the final rv ，将已分配的向量从池子中去掉
-            # all_idx = np.arange(self.etf_vec.shape[0])
-            # etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
-            # del self.etf_vec
-            # self.register_buffer('etf_vec', etf_vec)
+            if self.target_choose == "fix":
+                # Remove from the final rv ，将已分配的向量从池子中去掉
+                all_idx = np.arange(self.etf_vec.shape[0])
+                etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
+                del self.etf_vec
+                self.register_buffer('etf_vec', etf_vec)
             print(f"assignIndex: {self.assignIndex}")
         # 将类别对应的 target 向量返回
         assign_target = torch.cat([self.assignInfo[label] for label in source_labels], dim=0)

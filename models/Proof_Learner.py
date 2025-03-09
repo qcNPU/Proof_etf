@@ -19,6 +19,7 @@ class Learner(BaseLearner):
         self.batch_size = get_attribute(args,"batch_size", 64)
         self.setting = get_attribute(args,"setting", "proof")
         self.train_templates = get_attribute(args,"train_templates", "one")
+        self.target_choose = get_attribute(args,"target_choose", "reselect")
         self.increment = get_attribute(args,"increment", 10)
         self.proto_num = get_attribute(args,"proto_num", 4)
         self.seed = get_attribute(args,"seed", 1993)
@@ -224,7 +225,7 @@ class Learner(BaseLearner):
                 self._cur_task,epoch + 1,self.args['tuned_epoch'],losses / len(train_loader),train_acc, test_acc,  )
             # prog_bar.set_description(info)
             print(info)
-        if "nc" in self.setting:
+        if "nc" in self.setting and self.target_choose == "reselect":
             self._network.eft_head.clear_assignment(self._total_classes)
         return test_acc,task_acc
 
