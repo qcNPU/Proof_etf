@@ -1,58 +1,61 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyArrowPatch
 
-# ===================== 配置参数 =====================
-num_class = 10  # 与图中10个数字标签对应
-prior_length = 0.7  # 短箭头长度（对应红色）
-our_length = 0.9  # 长箭头长度（对应蓝色）
-circle_radius = 1.0  # 圆周半径
-text_offset = 0.1  # 类别标签偏移量
-arrow_colors = {'Prior': '#D62728', 'Our': '#1F77B4'}  # 红蓝配色
+# ===================== 数据准备 =====================
+theta = np.linspace(0, 2 * np.pi, 10, endpoint=False)
+r_old = np.array([1.5, 3, 2, 1.0, 4, 1, 0.5, 0.0, 0.5, 1])  # 旧方法数据
+r_new = np.full(theta.shape, 4)  # 新方法全部延伸到圆周
+colors = plt.cm.tab10(np.arange(10))  # 使用tab10颜色映射
 
-# ===================== 数据生成 =====================
-theta = np.linspace(0, 2 * np.pi, num_class, endpoint=False)
-etf_points = np.array([np.cos(theta), np.sin(theta)]).T * circle_radius
+# ===================== 可视化设置 =====================
+plt.figure(figsize=(8, 8))
+ax = plt.subplot(111, polar=True)
 
-# ===================== 可视化 =====================
-fig, ax = plt.subplots(figsize=(8, 8), facecolor='white')  # 强制白底
+# 绘制带箭头的径向线（旧方法虚线，新方法实线）
+for i in range(len(theta)):
+    # 旧方法（虚线）
+    arrow = FancyArrowPatch(
+        (0, 0),  # 起点（圆心）
+        (theta[i], r_old[i]),  # 终点（极坐标）
+        arrowstyle='->',
+        linestyle='--',
+        color=colors[i],
+        linewidth=1,
+        mutation_scale=15,  # 调整箭头大小
+        transform=ax.transData,  # 使用极坐标变换
+    )
+    ax.add_patch(arrow)
 
-# ---- 绘制圆形基底 ----
-ax.add_artist(plt.Circle((0, 0), circle_radius, fill=False, color='gray', linewidth=1))
+    # 新方法（实线）
+    arrow = FancyArrowPatch(
+        (0, 0),  # 起点（圆心）
+        (theta[i], r_new[i]),  # 终点（极坐标）
+        arrowstyle='->',
+        linestyle='-',
+        color=colors[i],
+        linewidth=1,
+        mutation_scale=15,
+        transform=ax.transData,
+    )
+    ax.add_patch(arrow)
 
-# ---- 绘制双组箭头 ----
-for i in range(num_class):
-    # 红色短箭头（实线+虚线延伸）
-    ax.plot([0, prior_length * etf_points[i, 0]],
-            [0, prior_length * etf_points[i, 1]],
-            color=arrow_colors['Prior'], linewidth=2)
-    ax.plot([prior_length * etf_points[i, 0], etf_points[i, 0]],
-            [prior_length * etf_points[i, 1], etf_points[i, 1]],
-            '--', color=arrow_colors['Prior'], linewidth=1)
+# 添加圆周上的星星标记
+ax.scatter(theta, r_new,
+           marker='*',
+           s=80,  # 星星大小
+           color='gold',
+           edgecolor='black',
+           zorder=4,
+           linewidths=1)
 
-    # 蓝色长箭头（实线+虚线延伸）
-    ax.plot([0, our_length * etf_points[i, 0]],
-            [0, our_length * etf_points[i, 1]],
-            color=arrow_colors['Our'], linewidth=2)
-    ax.plot([our_length * etf_points[i, 0], etf_points[i, 0]],
-            [our_length * etf_points[i, 1], etf_points[i, 1]],
-            '--', color=arrow_colors['Our'], linewidth=1)
+# ===================== 样式优化 =====================
+ax.set_xticklabels([])  # 移除角度刻度标签
+ax.set_theta_offset(np.pi / 2)  # 0度起始位置在顶部
+ax.set_theta_direction(-1)  # 顺时针方向
+ax.set_rgrids([0, 1, 2, 3, 4], angle=0)  # 设置径向刻度
+ax.grid(alpha=0.3)  # 网格透明度
+ax.set_facecolor('white')  # 背景颜色
 
-# ---- 添加类别标签 ----
-for i, (x, y) in enumerate(etf_points):
-    angle = np.degrees(theta[i])
-    # 智能调整标签位置防止重叠
-    ha = 'left' if (angle > 150 or angle < 30) else 'right' if angle > 210 else 'center'
-    va = 'bottom' if 10 < angle < 170 else 'top' if 190 < angle < 350 else 'center'
-    ax.text(x * (1 + text_offset), y * (1 + text_offset), str(i),
-            ha=ha, va=va, fontsize=12, color='black')
-
-# ---- 隐藏所有坐标元素 ----
-ax.set_xticks([])
-ax.set_yticks([])
-ax.spines[:].set_visible(False)
-ax.set_xlim(-1.1, 1.1)
-ax.set_ylim(-1.1, 1.1)
-ax.set_aspect('equal')
-
-plt.savefig("white_background_prototype.png", dpi=300, bbox_inches='tight')
-plt.close()
+plt.savefig('enhanced_radial_plot.png', dpi=300, bbox_inches='tight')
+plt.show()

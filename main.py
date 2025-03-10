@@ -33,6 +33,7 @@ def setup_parser():
     parser.add_argument('--train_templates', type=str, default='all', help='Json file of settings.')
     parser.add_argument('--convnet_type', type=str, default='clip', help='Json file of settings.')
     parser.add_argument('--target_choose', type=str, default='reselect',choices=['reselect','fix'], help='Json file of settings.')
+    parser.add_argument('--text_optimize', type=str, default='loop',choices=['loop','optimize'], help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/ncscmp.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/cub.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/car.json', help='Json file of settings.')

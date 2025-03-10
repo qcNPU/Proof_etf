@@ -125,7 +125,8 @@ class iImageNetSub(iData):
 
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
-        print(train_dset.classes)
+        print("sorted:",train_dset.classes)
+        print("sorted:",train_dset.class_to_idx)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -148,8 +149,7 @@ class iImageNetR(iData):
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
 
-        print(train_dset.class_to_idx)
-        # print(test_dset.class_to_idx)
+        print("sorted:",train_dset.classes)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -171,8 +171,7 @@ class tiny_imagenet(iData):
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
 
-        print(train_dset.class_to_idx)
-        print(train_dset.classes)
+        print("sorted:",train_dset.classes)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -262,7 +261,7 @@ class Food101(iData):
         train_dset = datasets.ImageFolder(train_dir)
         test_dset = datasets.ImageFolder(test_dir)
 
-        print(train_dset.class_to_idx)
+        print("sorted:",train_dset.classes)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)

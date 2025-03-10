@@ -79,6 +79,7 @@ class ETFHead(ClsHead):
 
         super().__init__(*args, **kwargs)
         self.target_choose =target_choose
+        print("etfhead target_choose:",self.target_choose)
         self.losses = "dr"
         # self.losses = "supcontra"
         if self.losses == "dr":
