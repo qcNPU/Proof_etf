@@ -172,3 +172,47 @@ class ClipLoss(nn.Module):
                      ) / 2
 
         return {"contrastive_loss": total_loss} if output_dict else total_loss
+
+
+def save_tensors(save_name,class_protos):
+
+    # 保存完整张量（包含设备信息）
+    torch.save(class_protos, f'{save_name}.pth')  #注意cuda和cpu
+
+
+# ===================== 数据加载 =====================
+def load_tensors(save_name):
+    data = torch.load(f'{save_name}.pth', map_location='cpu')
+    return data
+
+
+# ===================== 向量选择 =====================
+def select_vectors(targets, n=10):
+    """选择笛卡尔坐标系中分布最广的向量"""
+    # 使用主成分分析
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=2)
+    coords = pca.fit_transform(targets)
+
+    # 计算极角
+    angles = np.arctan2(coords[:, 1], coords[:, 0])  # 使用PCA后的坐标
+
+    # 选择等角度间隔的样本
+    selected_indices = []
+    target_angles = np.linspace(-np.pi, np.pi, n, endpoint=False)
+
+    for angle in target_angles:
+        diff = np.abs(angles - angle)
+        idx = np.argmin(diff)
+        if idx not in selected_indices:
+            selected_indices.append(idx)
+
+    return selected_indices[:n]
+
+def stratified_sample(features, labels, samples_per_class=50):
+    sampled_features = []
+    for cls in np.unique(labels):
+        idx = np.where(labels == cls)[0]
+        np.random.shuffle(idx)
+        sampled_features.append(features[idx[:samples_per_class]])
+    return np.vstack(sampled_features)

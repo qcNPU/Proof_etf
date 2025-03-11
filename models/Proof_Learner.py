@@ -1,3 +1,4 @@
+import torch
 from torch import optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -24,6 +25,7 @@ class Learner(BaseLearner):
         self.increment = get_attribute(args,"increment", 10)
         self.proto_num = get_attribute(args,"proto_num", 4)
         self.seed = get_attribute(args,"seed", 1993)
+        self.num_classes = get_attribute(args, 'num_classes', 100)
         self.gen_proto_mode = get_attribute(args,"gen_proto_mode", "kmeans++")
         self.init_lr = get_attribute(args, "init_lr", 0.02)
         self.weight_decay = get_attribute(args, "weight_decay", 0.0005)
@@ -143,7 +145,7 @@ class Learner(BaseLearner):
                     text_features = self._network.encode_text(texts) # [total_classes, dim]
                     text_feas = text_features / text_features.norm(dim=-1, keepdim=True)
                 else:
-                    text_feas = self.use_templates_mean(total_cls_names,templates)
+                    text_feas = self.use_templates_mean(total_cls_names,templates,self.text_optimize)
 
                 image_features = self._network.encode_image(inputs)
                 img_feas = image_features / image_features.norm(dim=-1, keepdim=True) #[bs, dim]
@@ -197,7 +199,7 @@ class Learner(BaseLearner):
                     clip_text_feas=self._network.encode_text(self._network.tokenizer(texts).to(self._device))#total,dim
                     clip_text_feas = clip_text_feas / clip_text_feas.norm(dim=-1, keepdim=True)
                 else:
-                    clip_text_feas = self.use_templates_mean(cls_names,templates)
+                    clip_text_feas = self.use_templates_mean(cls_names,templates,self.text_optimize)
 
                 clip_loss = cliploss(img_feas, clip_text_feas, logit_scale)  # 这个loss有效
 
@@ -231,8 +233,8 @@ class Learner(BaseLearner):
         return test_acc,task_acc
 
 
-    def use_templates_mean(self,total_cls_names,templates):
-        if self.text_optimize == "loop":
+    def use_templates_mean(self,total_cls_names,templates,text_optimize):
+        if text_optimize == "loop":
             text_features = []
             for l in total_cls_names:
                 texts = [t.format(l) for t in templates]
@@ -295,7 +297,7 @@ class Learner(BaseLearner):
             #     class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
             #     text_features.append(class_embeddings)
             # text_features = torch.stack(text_features, dim=0)
-            text_features = self.use_templates_mean(total_labels,templates)  #这里本来就是用所有的  ,这个写法跟上面的代码效果完全一样，但是内存占用会不断飙升
+            text_features = self.use_templates_mean(total_labels,templates,self.text_optimize)  #这里本来就是用所有的  ,这个写法跟上面的代码效果完全一样，但是内存占用会不断飙升
 
         # use_multi_proto = True
         use_multi_proto = "mp" in self.setting
@@ -358,6 +360,42 @@ class Learner(BaseLearner):
         return np.around(tensor2numpy(correct) * 100 / total, decimals=2),task_accuracies
 
 
+    def get_last_proto(self):# 只计算 top1
+        self._network.eval()
+        class_to_label = self.data_manager._class_to_label
+        templates = self.data_manager._data_to_prompt
+        total_labels = class_to_label # mask all known classes
+        with torch.no_grad():
+            text_features = self.use_templates_mean(total_labels,templates,self.text_optimize)  #这里本来就是用所有的  ,这个写法跟上面的代码效果完全一样，但是内存占用会不断飙升
+
+        use_multi_proto = "mp" in self.setting
+        final_protos=[]
+        final_images=[]
+        final_texts=[]
+        for class_idx in range(self._total_classes):
+            class_dset = self.data_manager.get_dataset(np.arange(class_idx, class_idx + 1), source="test", mode="test")
+            class_loader = DataLoader(class_dset, batch_size=self.batch_size, shuffle=False, num_workers=4)
+            for i, (_, inputs, targets) in enumerate(class_loader):
+                inputs = inputs.to(self._device)
+                with torch.no_grad():
+                    image_features=self._network.encode_image(inputs)     #todo 要把test feature加进去，那就是两张图对比，fusion之后的image feature和prototype
+                    transf_image_features, transf_text_features, _, proto_feas = self._network.forward_transformer(
+                        image_features, text_features,self._train_transformer,use_multi_proto=use_multi_proto)
+                    final_protos.append(proto_feas.view(self._total_classes,-1,self.feature_dim)[class_idx,:,:])
+                    final_images.append(transf_image_features)
+                    final_texts.append(transf_text_features)
+                break
+        final_protos = torch.cat(final_protos,dim=0)
+        final_images = torch.stack(final_images,dim=0)
+        final_texts = torch.stack(final_texts,dim=0)
+        save_tensors(self.setting,final_protos)
+        save_tensors(f"{self.setting}_class_image",final_images)
+        save_tensors(f"{self.setting}_class_text",final_texts)
+        if "nc" in self.setting:
+            save_tensors(f"{self.setting}_etf",self._network.eft_head.etf_vec)
+        print(f"{final_protos.shape},{final_images.shape},{final_texts.shape}")
+        print("save proto finish")
+
     def _eval_cnn(self, loader):#会计算topK
 
         self._network.eval()
@@ -396,5 +434,3 @@ class Learner(BaseLearner):
             y_true.append(targets.cpu().numpy())
 
         return np.concatenate(y_pred), np.concatenate(y_true)  # [N, topk]
-
-
