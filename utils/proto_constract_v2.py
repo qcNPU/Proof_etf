@@ -7,9 +7,9 @@ from sklearn.manifold import TSNE
 # ===================== 配置参数 =====================
 class VisualConfig:
     # 颜色和形状配置
-    colors = ['#FF1F5B', '#009ADE', '#00CD6C']  # 红，蓝，绿
-    markers = ['o', 's', '*']  # 圆形，方形，三角形
-    sizes = [100, 100, 120]  # 标记尺寸
+    colors = ['#FF0000', '#0000FF', '#000000']  # 红，蓝，绿
+    markers = ['o', 'o', '*']  # 圆形，方形，三角形
+    sizes = [100, 100, 140]  # 标记尺寸
     alphas = [1, 1, 1]  # 透明度
     labels = ['Proof', 'Ours', 'ETF']  # 图例标签
 
@@ -82,12 +82,19 @@ def visualize_prototypes(embeddings, labels):
     # plt.ylabel("t-SNE 2", fontsize=12)
     # plt.title("Prototype Distribution Comparison", fontsize=14, pad=20)
     plt.grid(alpha=0.2)
+    ax = plt.gca()
+    ax.set_xticks([])
+    ax.set_yticks([])
+    # 设置边框颜色和线宽
+    for spine in ax.spines.values():
+        spine.set_color('black')
+        spine.set_linewidth(0.8)
 
     # 输出设置
     plt.tight_layout()
     plt.savefig('prototype_comparison.png', dpi=300, bbox_inches='tight')
     plt.savefig("prototype_comparison.pdf", format="pdf", bbox_inches='tight', dpi=300)
-    plt.show()
+    # plt.show()
 
 
 # ===================== 主流程 =====================

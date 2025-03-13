@@ -22,7 +22,7 @@ def visualize_dual_pdf(embeddings_list, labels_list, titles, output_name="dual_m
                     embeddings[mask, 0], embeddings[mask, 1],
                     c=VisualConfig.colors[cls],
                     marker=VisualConfig.feature_marker,
-                    s=50, alpha=0.6,
+                    s=50, alpha=1,
                     edgecolors='w', linewidths=0.5
                 )
 
@@ -42,9 +42,15 @@ def visualize_dual_pdf(embeddings_list, labels_list, titles, output_name="dual_m
                     transform=ax.transAxes,
                     ha='center', va='top', fontsize=16)
 
-            ax.set_xlabel("t-SNE 1", fontsize=12)
-            ax.set_ylabel("t-SNE 2", fontsize=12)
+            # ax.set_xlabel("t-SNE 1", fontsize=12)
+            # ax.set_ylabel("t-SNE 2", fontsize=12)
             ax.grid(alpha=0.2)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            # 设置边框颜色和线宽
+            for spine in ax.spines.values():
+                spine.set_color('black')
+                spine.set_linewidth(0.8)
 
         # --- 图例全局配置 ---
         handles = [
