@@ -1,12 +1,66 @@
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 from toolkit import *
 
+def visualize_dual_pdf(embeddings_list, labels_list, titles, output_name="dual_methods.pdf"):
+    """双方法PDF并排可视化"""
+    with PdfPages(output_name) as pdf:
+        fig, axes = plt.subplots(1, 2, figsize=(24, 10))
 
-# ===================== 配置参数 =====================
+        for ax, embeddings, labels, title in zip(axes, embeddings_list, labels_list, titles):
+            # --- 可视化逻辑（适配单个子图）---
+            num_classes = 10
+
+            # 绘制Image Features
+            for cls in range(num_classes):
+                mask = (labels == cls) & (labels < 10)
+                ax.scatter(
+                    embeddings[mask, 0], embeddings[mask, 1],
+                    c=VisualConfig.colors[cls],
+                    marker=VisualConfig.feature_marker,
+                    s=50, alpha=0.6,
+                    edgecolors='w', linewidths=0.5
+                )
+
+            # 绘制Prototypes
+            for cls in range(num_classes):
+                mask = (labels == (cls + 10)) & (labels >= 10)
+                ax.scatter(
+                    embeddings[mask, 0], embeddings[mask, 1],
+                    c=VisualConfig.colors[cls],
+                    marker=VisualConfig.proto_marker,
+                    s=200, edgecolors='black',
+                    linewidths=1
+                )
+
+            # --- 子图标题配置 ---
+            ax.text(0.5, -0.12, f'({title[0]}) {title[1]}',
+                    transform=ax.transAxes,
+                    ha='center', va='top', fontsize=16)
+
+            ax.set_xlabel("t-SNE 1", fontsize=12)
+            ax.set_ylabel("t-SNE 2", fontsize=12)
+            ax.grid(alpha=0.2)
+
+        # --- 图例全局配置 ---
+        handles = [
+            plt.Line2D([0], [0], marker='o', color='w', label='Image Features',
+                       markersize=10, markerfacecolor='gray'),
+            plt.Line2D([0], [0], marker='*', color='w', label='Prototype',
+                       markersize=15, markerfacecolor='gray')
+        ]
+        fig.legend(handles=handles, loc='lower center',
+                   bbox_to_anchor=(0.5, 0.92), ncol=2, fontsize=12)
+
+        plt.tight_layout()
+        pdf.savefig(bbox_inches='tight')
+        plt.show()
+        plt.close()
+
 class VisualConfig:
     # 颜色配置（10个类别）
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
@@ -33,10 +87,10 @@ class VisualConfig:
 
 
 # ===================== 数据加载与处理 =====================
-def load_and_preprocess():
+def load_and_preprocess(setting):
     """加载并合并image feature和Prototype数据"""
     # 假设每个类别的image feature和Prototype已加载
-    setting = "proof"
+    # setting = "proof"
     # setting = "proofncscmp"
     if "mp" in setting:
         image_features = torch.load("proofncscmp_class_image.pth").cpu().numpy()
@@ -84,71 +138,29 @@ def load_and_preprocess():
     # return StandardScaler().fit_transform(combined_data), combined_labels,num_prototypes,setting
 
 
-# ===================== 可视化引擎 =====================
-# ===================== 可视化引擎 =====================
-def visualize_features_and_prototypes(embeddings, labels, num_prototypes=5,setting=None):
-    """支持多Prototype的层级可视化"""
-    num_classes = 10
-    plt.figure(figsize=(15, 10))
-
-    # 定义Prototype的不同标记（例如每个类别3个不同标记）
-    proto_markers = ['*', '^', 's']  # 星号、三角形、正方形
-
-    # 绘制image features（前200个点）
-    for cls in range(num_classes):
-        mask = (labels == cls) & (labels < 10)
-        # print(f"Class {cls} 实际样本数:", np.sum(mask))
-        plt.scatter(
-            embeddings[mask, 0], embeddings[mask, 1],
-            c=VisualConfig.colors[cls],
-            marker=VisualConfig.feature_marker,
-            s=50, alpha=0.6,
-            edgecolors='w', linewidths=0.5,
-            label=f'Class {cls} Features' if cls == 0 else None
-        )
-
-    # 绘制Prototypes（后10*N个点）
-    for cls in range(num_classes):
-        for proto_id in range(num_prototypes):
-            mask = (labels == (cls + 10)) & (labels >= 10)
-            # 选择当前Prototype实例的索引
-            proto_mask = np.where(labels == (cls + 10))[0][proto_id::num_prototypes]
-
-            plt.scatter(
-                embeddings[proto_mask, 0], embeddings[proto_mask, 1],
-                c=VisualConfig.colors[cls],
-                marker=proto_markers[0],
-                s=200, edgecolors='black',
-                linewidths=1,
-                label=f'Prototype' if cls == 0 else None  # 只显示第一个类别的图例
-            )
-
-    # 图例优化
-    handles, labels_legend = plt.gca().get_legend_handles_labels()
-    plt.legend(handles, ['Image Features', 'Prototype'],
-               loc='upper right', framealpha=0.9)
-
-    # 坐标轴美化
-    plt.xlabel("t-SNE 1", fontsize=12)
-    plt.ylabel("t-SNE 2", fontsize=12)
-    # plt.title(f"{num_prototypes} Prototypes per Class", fontsize=14)
-    plt.grid(alpha=0.2)
-    plt.savefig(f'proto_cover_feat_{setting}.png', dpi=300, bbox_inches='tight')
-    plt.savefig(f"proto_cover_feat_{setting}.pdf", format="pdf", bbox_inches='tight', dpi=300)
-    plt.show()
-
-# ===================== 主流程 =====================
 def main():
     # 数据准备
-    combined_data, labels, num_prototypes,setting = load_and_preprocess()
+    sets = ["proof","proofncscmp"]
+    embs = []
+    labs=[]
+    for setting in sets:
+        combined_data, labels, num_prototypes,setting = load_and_preprocess(setting)
 
-    # 执行t-SNE
-    print("Running t-SNE...")
-    tsne = TSNE(**VisualConfig.tsne_params)
-    embeddings = tsne.fit_transform(combined_data)
+        # 执行t-SNE
+        print("Running t-SNE...")
+        tsne = TSNE(**VisualConfig.tsne_params)
+        embeddings = tsne.fit_transform(combined_data)
 
-    # 可视化
-    visualize_features_and_prototypes(embeddings, labels,num_prototypes,setting)
+        embs.append(embeddings)
+        labs.append(labels)
+
+    # 调用可视化函数
+    visualize_dual_pdf(
+        embeddings_list=embs,
+        labels_list=labs,
+        titles=[('a', 'Proof'), ('b', 'Our Method')],
+        output_name="feat-proto_comparison.pdf"
+    )
 
 
 if __name__ == "__main__":

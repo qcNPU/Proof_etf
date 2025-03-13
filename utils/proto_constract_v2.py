@@ -8,9 +8,9 @@ from sklearn.manifold import TSNE
 class VisualConfig:
     # 颜色和形状配置
     colors = ['#FF1F5B', '#009ADE', '#00CD6C']  # 红，蓝，绿
-    markers = ['o', 's', '^']  # 圆形，方形，三角形
-    sizes = [80, 100, 120]  # 标记尺寸
-    alphas = [0.8, 0.9, 0.7]  # 透明度
+    markers = ['o', 's', '*']  # 圆形，方形，三角形
+    sizes = [100, 100, 120]  # 标记尺寸
+    alphas = [1, 1, 1]  # 透明度
     labels = ['Proof', 'Ours', 'ETF']  # 图例标签
 
     # t-SNE参数
@@ -78,9 +78,9 @@ def visualize_prototypes(embeddings, labels):
     legend.get_frame().set_linewidth(0.5)  # 边框宽度
 
     # 坐标轴美化
-    plt.xlabel("t-SNE 1", fontsize=12)
-    plt.ylabel("t-SNE 2", fontsize=12)
-    plt.title("Prototype Distribution Comparison", fontsize=14, pad=20)
+    # plt.xlabel("t-SNE 1", fontsize=12)
+    # plt.ylabel("t-SNE 2", fontsize=12)
+    # plt.title("Prototype Distribution Comparison", fontsize=14, pad=20)
     plt.grid(alpha=0.2)
 
     # 输出设置

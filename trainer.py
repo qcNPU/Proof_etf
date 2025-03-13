@@ -90,7 +90,8 @@ def _train(args):
 
     # forgetting_rates, avg_forgetting = compute_forgetting_rates(acc_history)
     # print("final forgetting pertask:",forgetting_rates,",avg_forgetting",avg_forgetting)
-    model.get_last_proto()
+    if args["save_proto"] and args["dataset"] != 'imagenetr':
+        model.get_last_proto()
 
     return np.mean(cnn_curve["top1"]),cnn_curve["top1"][-1],0
 
