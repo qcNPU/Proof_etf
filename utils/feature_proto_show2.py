@@ -6,13 +6,14 @@ from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 from toolkit import *
 
+
 def visualize_dual_pdf(embeddings_list, labels_list, titles, output_name="dual_methods.pdf"):
     """双方法PDF并排可视化"""
     with PdfPages(output_name) as pdf:
         fig, axes = plt.subplots(1, 2, figsize=(24, 10))
 
         for ax, embeddings, labels, title in zip(axes, embeddings_list, labels_list, titles):
-            # --- 可视化逻辑（适配单个子图）---
+            # --- 可视化逻辑 ---
             num_classes = 10
 
             # 绘制Image Features
@@ -37,40 +38,55 @@ def visualize_dual_pdf(embeddings_list, labels_list, titles, output_name="dual_m
                     linewidths=1
                 )
 
-            # --- 子图标题配置 ---
-            ax.text(0.5, -0.12, f'({title[0]}) {title[1]}',
+            # --- 子图样式配置 ---
+            ax.text(0.5, -0.08, f'({title[0]}) {title[1]}',
                     transform=ax.transAxes,
-                    ha='center', va='top', fontsize=16)
+                    ha='center', va='top', fontsize=18)
 
-            # ax.set_xlabel("t-SNE 1", fontsize=12)
-            # ax.set_ylabel("t-SNE 2", fontsize=12)
-            ax.grid(alpha=0.2)
+            # 移除坐标轴标签
             ax.set_xticks([])
             ax.set_yticks([])
-            # 设置边框颜色和线宽
             for spine in ax.spines.values():
                 spine.set_color('black')
                 spine.set_linewidth(0.8)
 
-        # --- 图例全局配置 ---
-        handles = [
-            plt.Line2D([0], [0], marker='o', color='w', label='Image Features',
-                       markersize=10, markerfacecolor='gray'),
-            plt.Line2D([0], [0], marker='*', color='w', label='Prototype',
-                       markersize=15, markerfacecolor='gray')
-        ]
-        fig.legend(handles=handles, loc='lower center',
-                   bbox_to_anchor=(0.5, 0.92), ncol=2, fontsize=12)
+            # --- 图例配置（左上角）---
+            marker_legend = [
+                plt.Line2D([0], [0], marker='o', color='w',
+                           label='Image Features',
+                           markersize=12,
+                           markerfacecolor='gray'),
+                plt.Line2D([0], [0], marker='*', color='w',
+                           label='Prototype',
+                           markersize=18,
+                           markerfacecolor='gray',
+                           markeredgecolor='black')
+            ]
+
+            ax.legend(
+                handles=marker_legend,
+                loc='upper left',
+                bbox_to_anchor=(0.02, 0.98),  # 左上角微调
+                fontsize=12,
+                frameon=True,
+                framealpha=0.9,
+                edgecolor='black'
+            )
 
         plt.tight_layout()
         pdf.savefig(bbox_inches='tight')
-        plt.show()
         plt.close()
 
 class VisualConfig:
     # 颜色配置（10个类别）
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-              '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    # colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+    #           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    colors = [
+        '#FF0000', '#0000FF', '#000000',  # 红、蓝、黑
+        '#00FF00', '#FF00FF', '#A020F0',  # 绿、粉、亮紫（替换黄色）
+        '#00FFFF', '#800080', '#FFA500',  # 青、紫、橙
+        '#008000'  # 深绿
+    ]
 
     # 标记配置
     feature_marker = 'o'  # 圆圈表示image feature
