@@ -22,6 +22,9 @@ class Learner(BaseLearner):
         self.train_templates = get_attribute(args,"train_templates", "one")
         self.text_optimize = get_attribute(args,"text_optimize", "loop")
         self.target_choose = get_attribute(args,"target_choose", "reselect")
+        self.target_match = get_attribute(args, "target_match", "cosine")
+        if self.target_match == "random":
+            self.target_choose = "fix"
         self.optimize_feat = get_attribute(args,"optimize_feat", "textimage")
         self.increment = get_attribute(args,"increment", 10)
         self.proto_num = get_attribute(args,"proto_num", 4)
@@ -379,7 +382,7 @@ class Learner(BaseLearner):
         final_texts=[]
         for class_idx in range(self._total_classes):
             class_dset = self.data_manager.get_dataset(np.arange(class_idx, class_idx + 1), source="test", mode="test")
-            class_loader = DataLoader(class_dset, batch_size=self.batch_size, shuffle=False, num_workers=4)
+            class_loader = DataLoader(class_dset, batch_size=self.batch_size, shuffle=False, num_workers=num_workers)
             for i, (_, inputs, targets) in enumerate(class_loader):
                 inputs = inputs.to(self._device)
                 with torch.no_grad():

@@ -71,7 +71,7 @@ class ETFHead(ClsHead):
         in_channels (int): Number of channels in the input feature map.
     """
 
-    def __init__(self, num_classes: int, in_channels: int,device,target_choose, *args, **kwargs) -> None:
+    def __init__(self, num_classes: int, in_channels: int,device,target_choose,target_match, *args, **kwargs) -> None:
         if kwargs.get('eval_classes', None):
             self.eval_classes = kwargs.pop('eval_classes')
         else:
@@ -79,7 +79,10 @@ class ETFHead(ClsHead):
 
         super().__init__(*args, **kwargs)
         self.target_choose =target_choose
-        print("etfhead target_choose:",self.target_choose)
+        self.target_match =target_match
+        if self.target_match == "random":
+            self.target_choose = "fix"
+        print(f"etfhead target_choose:{self.target_choose},target_match:{ self.target_match}")
         self.losses = "dr"
         # self.losses = "supcontra"
         if self.losses == "dr":
@@ -99,7 +102,7 @@ class ETFHead(ClsHead):
         one_nc_nc: torch.Tensor = torch.mul(torch.ones(self.num_classes, self.num_classes), (1 / self.num_classes))
         etf_vec = torch.mul(torch.matmul(orth_vec, i_nc_nc - one_nc_nc),
                             math.sqrt(self.num_classes / (self.num_classes - 1)))
-        self.register_buffer('etf_vec', etf_vec.T)
+        self.register_buffer('etf_vec', etf_vec.T)  #最终放进去的：(100,512)
         self.assignInfo = {}
         self.assignIndex = {}
 
@@ -166,12 +169,24 @@ class ETFHead(ClsHead):
         if len(new_lb) > 0:
             # Normalise incoming prototypes
             # base_prototypes = normalize(source[-len(new_lb):,:])
-            keys = {ind:lb for ind,lb in enumerate(list(new_lb.values()))}
-            base_prototypes = source[list(new_lb.keys())]  # 按照索引顺序取出源向量
-            # 根据与class prototype 的相似度从初始化向量池中选择最相似的
-            cost = cosine_similarity(base_prototypes.detach().cpu(), self.etf_vec.cpu())
-            # labels 只用来记录哪个类别选了哪个向量
-            row_id, col_ind = linear_sum_assignment(cost, maximize=True)
+            if "random" in self.target_match:
+                num_new = len(new_lb)
+                # 获取所有可用的ETF向量索引（总数量需>=新类别数量）
+                num_etf = self.etf_vec.size(0)  # 假设etf_vec形状为 [num_etf, feature_dim]
+                assert num_etf >= num_new, "ETF向量数量不足"
+                # 生成随机无放回索引 (PyTorch设备兼容)
+                rand_indices = torch.randperm(num_etf, device=self.device)[:num_new]
+                col_ind = rand_indices.cpu().numpy()  # 转换为numpy数组保持接口兼容
+                row_id = np.arange(num_new)  # 按顺序分配新类别
+                # 定义keys（新增关键修复）
+                keys = {ind: lb for ind, lb in enumerate(list(new_lb.values()))}
+            else:
+                keys = {ind:lb for ind,lb in enumerate(list(new_lb.values()))}
+                base_prototypes = source[list(new_lb.keys())]  # 按照索引顺序取出源向量
+                # 根据与class prototype 的相似度从初始化向量池中选择最相似的
+                cost = cosine_similarity(base_prototypes.detach().cpu(), self.etf_vec.cpu())
+                # labels 只用来记录哪个类别选了哪个向量
+                row_id, col_ind = linear_sum_assignment(cost, maximize=True)
 
             # new_fc_tensor = self.etf_vec[col_ind]
             # Creating and appending a new classifier from the given reserved vectors

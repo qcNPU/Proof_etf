@@ -34,6 +34,7 @@ def setup_parser():
     parser.add_argument('--train_templates', type=str, default='one', help='Json file of settings.')
     parser.add_argument('--convnet_type', type=str, default='clip', help='Json file of settings.')
     parser.add_argument('--target_choose', type=str, default='reselect',choices=['reselect','fix'], help='Json file of settings.')
+    parser.add_argument('--target_match', type=str, default='cosine',choices=['cosine','random'], help='Json file of settings.')
     parser.add_argument('--text_optimize', type=str, default='loop',choices=['loop','optimize'], help='Json file of settings.')
     parser.add_argument('--save_proto', type=bool, default=False, help='Json file of settings.')
     parser.add_argument('--optimize_feat', type=str, default='textimage',choices=['textimage','text','image'], help='Json file of settings.')
