@@ -167,13 +167,13 @@ class Learner(BaseLearner):
                     loss_etf1 = torch.zeros((1,), requires_grad=True).to(self._device)
                     loss_etf2 = torch.zeros((1,), requires_grad=True).to(self._device)
                     if 'text' in self.optimize_feat:
-                        loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                        loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class,'text')["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     if 'image' in self.optimize_feat:
                         if "mp" in self.setting:
-                            loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po,:].squeeze(1), seen_class)["loss"] for po in range(self.proto_num)])
+                            loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po,:].squeeze(1), seen_class,'image')["loss"] for po in range(self.proto_num)])
                             # loss_etf2 = self._network.eft_head.forward_train_v1(proto_features.mean(1), seen_class)["loss"]
                         else:
-                            loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                            loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class,'image')["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     loss_etf = self.ncloss*(loss_etf1+loss_etf2)
 

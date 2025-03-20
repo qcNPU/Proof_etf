@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Dict
 
 import math
@@ -71,7 +72,7 @@ class ETFHead(ClsHead):
         in_channels (int): Number of channels in the input feature map.
     """
 
-    def __init__(self, num_classes: int, in_channels: int,device,target_choose,target_match, *args, **kwargs) -> None:
+    def __init__(self, num_classes: int, in_channels: int,device,target_choose,target_match, common_match, *args, **kwargs) -> None:
         if kwargs.get('eval_classes', None):
             self.eval_classes = kwargs.pop('eval_classes')
         else:
@@ -80,6 +81,7 @@ class ETFHead(ClsHead):
         super().__init__(*args, **kwargs)
         self.target_choose =target_choose
         self.target_match =target_match
+        self.common_match = common_match
         if self.target_match == "random":
             self.target_choose = "fix"
         print(f"etfhead target_choose:{self.target_choose},target_match:{ self.target_match}")
@@ -105,6 +107,10 @@ class ETFHead(ClsHead):
         self.register_buffer('etf_vec', etf_vec.T)  #最终放进去的：(100,512)
         self.assignInfo = {}
         self.assignIndex = {}
+        if self.common_match != 'common':
+            self.register_buffer('etf_vec_text', deepcopy(etf_vec.T))  #最终放进去的：(100,512)
+            self.assignInfo_text = {}
+            self.assignIndex_text = {}
 
 
 
@@ -116,10 +122,10 @@ class ETFHead(ClsHead):
         return x
 
 
-    def forward_train_v1(self, match_vec, gt_label, **kwargs) -> Dict:
+    def forward_train_v1(self, match_vec, gt_label,modal, **kwargs) -> Dict:
 
         x = self.norm(match_vec)
-        target = self.assign_target(x, gt_label)
+        target = self.assign_target(x, gt_label,modal)
         if self.losses == "dr":
             losses = self.loss(x, target)
         else:
@@ -153,7 +159,7 @@ class ETFHead(ClsHead):
                 }
         return losses
 
-    def assign_target(self, source, source_labels):
+    def assign_target(self, source, source_labels, modal):
         """
         为新类别分配target，最后返回所有类别的target
         Args:
@@ -164,7 +170,11 @@ class ETFHead(ClsHead):
 
         """
         # new_lb = [i for i in source_labels if self.assignInfo.get(i.item()) is None]
-        new_lb = {ind: lb for ind, lb in enumerate(source_labels) if self.assignInfo.get(lb) is None}  # 字典去重
+        use_text = self.common_match != 'common' and modal == 'text'  #各自匹配
+        assignIndex =  self.assignIndex_text if use_text else self.assignIndex
+        assignInfo = self.assignInfo_text if use_text else self.assignInfo
+        etf_vec = self.etf_vec_text if use_text else self.etf_vec
+        new_lb = {ind: lb for ind, lb in enumerate(source_labels) if assignInfo.get(lb) is None}  # 字典去重
 
         if len(new_lb) > 0:
             # Normalise incoming prototypes
@@ -172,7 +182,7 @@ class ETFHead(ClsHead):
             if "random" in self.target_match:
                 num_new = len(new_lb)
                 # 获取所有可用的ETF向量索引（总数量需>=新类别数量）
-                num_etf = self.etf_vec.size(0)  # 假设etf_vec形状为 [num_etf, feature_dim]
+                num_etf = etf_vec.size(0)  # 假设etf_vec形状为 [num_etf, feature_dim]
                 assert num_etf >= num_new, "ETF向量数量不足"
                 # 生成随机无放回索引 (PyTorch设备兼容)
                 rand_indices = torch.randperm(num_etf, device=self.device)[:num_new]
@@ -184,7 +194,7 @@ class ETFHead(ClsHead):
                 keys = {ind:lb for ind,lb in enumerate(list(new_lb.values()))}
                 base_prototypes = source[list(new_lb.keys())]  # 按照索引顺序取出源向量
                 # 根据与class prototype 的相似度从初始化向量池中选择最相似的
-                cost = cosine_similarity(base_prototypes.detach().cpu(), self.etf_vec.cpu())
+                cost = cosine_similarity(base_prototypes.detach().cpu(), etf_vec.cpu())
                 # labels 只用来记录哪个类别选了哪个向量
                 row_id, col_ind = linear_sum_assignment(cost, maximize=True)
 
@@ -194,18 +204,22 @@ class ETFHead(ClsHead):
             # new_fc.weight.data.copy_(new_fc_tensor)
             # self.classifiers.append(new_fc)
             for i, label in keys.items():
-                self.assignInfo[label] = self.etf_vec[col_ind[i]].view(-1, self.in_channels)  # 把 value 直接变成向量
-                self.assignIndex[label] = col_ind[i]  # 先存着后面用
+                assignInfo[label] = etf_vec[col_ind[i]].view(-1, self.in_channels)  # 把 value 直接变成向量
+                assignIndex[label] = col_ind[i]  # 先存着后面用
 
             if self.target_choose == "fix":
                 # Remove from the final rv ，将已分配的向量从池子中去掉
-                all_idx = np.arange(self.etf_vec.shape[0])
-                etf_vec = self.etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
-                del self.etf_vec
-                self.register_buffer('etf_vec', etf_vec)
-            print(f"assignIndex: {self.assignIndex}")
+                all_idx = np.arange(etf_vec.shape[0])
+                etf_vec1 = etf_vec[all_idx[~np.isin(all_idx, col_ind)]]
+                if use_text:
+                    del self.etf_vec_text
+                    self.register_buffer('etf_vec_text', etf_vec1)
+                else:
+                    del self.etf_vec
+                    self.register_buffer('etf_vec', etf_vec1)
+            print(f"modal:{modal},assignIndex: {assignIndex}")
         # 将类别对应的 target 向量返回
-        assign_target = torch.cat([self.assignInfo[label] for label in source_labels], dim=0)
+        assign_target = torch.cat([assignInfo[label] for label in source_labels], dim=0)
         return assign_target
 
     def clear_assignment(self, class_num):
