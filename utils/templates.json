@@ -31,9 +31,7 @@
 		"a photo of the small {}."
     ],
     "food101": [
-        "a photo of a {}, a type of food.",
-        "a picture of {}, a kind of food.",
-        "the food is {}."
+        "a photo of a {}, a type of food."
     ],
     "cifar224": [
         "a photo of a {}.",

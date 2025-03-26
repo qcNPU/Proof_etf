@@ -380,10 +380,7 @@ class Proof_Net(SimpleClipNet):
         self._device = args["device"][0]
         self.projtype = get_attribute(self.args, 'projection_type', 'mlp')
         self.target_choose = get_attribute(args, "target_choose", "reselect")
-        self.common_match = get_attribute(args, "common_match", "common")
         self.target_match = get_attribute(args, "target_match", "cosine")
-        if self.target_match == "random":
-            self.target_choose = "fix"
         self.num_classes = get_attribute(self.args, 'num_classes', 100)
         self.context_prompt_length_per_task = get_attribute(self.args, 'context_prompt_length_per_task', 3)
         self.proto_num = get_attribute(args, "proto_num", 1)
@@ -391,7 +388,7 @@ class Proof_Net(SimpleClipNet):
         self.sel_attn = MultiHeadAttention(1, self.feature_dim, self.feature_dim, self.feature_dim, dropout=0.1)
         self.img_prototypes = None
         if "nc" in self.setting:
-            self.eft_head = ETFHead(self.num_classes, self.feature_dim,self._device,self.target_choose,self.target_match,self.common_match)
+            self.eft_head = ETFHead(self.num_classes, self.feature_dim,self._device,self.target_choose,self.target_match)
 
         self.context_prompts = nn.ParameterList()
 

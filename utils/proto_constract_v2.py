@@ -6,21 +6,20 @@ from sklearn.manifold import TSNE
 
 # ===================== 配置参数 =====================
 class VisualConfig:
-    # 颜色和形状配置
-    colors = ['#FF0000', '#0000FF', '#000000']  # 红，蓝，绿
-    markers = ['o', 'o', '*']  # 圆形，方形，三角形
-    sizes = [100, 100, 140]  # 标记尺寸
-    alphas = [1, 1, 1]  # 透明度
-    labels = ['Proof', 'Ours', 'ETF']  # 图例标签
+    # 颜色配置（每个组生成10种渐变色）
+    color_maps = ['#FF0000', '#0000FF', '#000000'] # 红，蓝，绿
+    markers = ['o', 'o', '*']  # 圆形，圆形，星形
+    sizes = [100, 100, 120]  # 标记尺寸
+    alphas = [1, 1, 1]  # 完全不透明
+    labels = ['Proof', 'Ours', 'ETF']
 
     # t-SNE参数
     tsne_params = {
         'n_components': 2,
-        'perplexity': 30,
+        'perplexity': 29,
         'n_iter': 2000,
         'learning_rate': 300,
         'metric': 'cosine',
-        # 'metric' :"euclidean",
         'random_state': 42
     }
 
@@ -28,79 +27,91 @@ class VisualConfig:
 # ===================== 数据加载与处理 =====================
 def load_and_preprocess():
     """加载并合并三组Prototype数据"""
-    # 加载原始数据
+    # 加载原始数据（示例路径，请根据实际修改）
     proof = torch.load("proof.pth").view(100, -1).cpu().numpy()
+    ours = torch.load("proofncscmp.pth").view(100, -1, 512)[:, 0, :].cpu().numpy()
+    etf = torch.load("proofncscmp_etf.pth").view(100, -1).cpu().numpy()
     # ours = torch.load("proofnc.pth").view(100, -1).cpu().numpy()
     # etf = torch.load("proofnc_etf.pth").view(100, -1).cpu().numpy()
-    ours = torch.load("proofncscmp.pth").view(100, -1,512)[:,0,:].cpu().numpy()
-    etf = torch.load("proofncscmp_etf.pth").view(100, -1).cpu().numpy()
 
     # 合并数据并创建标签
     combined = np.concatenate([proof, ours, etf])
-    labels = np.array([0] * 100 + [1] * 100 + [2] * 100)  # 0:proof, 1:ours, 2:etf
+    labels = np.array([0] * 100 + [1] * 100 + [2] * 100)
 
-    # 标准化处理
-    from sklearn.preprocessing import StandardScaler
-    return StandardScaler().fit_transform(combined), labels
+    # 先进行PCA降维到50维
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=91)  #数字越小，靠的越近
+    combined = pca.fit_transform(combined)
+    return combined, labels
 
 
 # ===================== 可视化引擎 =====================
-def visualize_prototypes(embeddings, labels):
-    """专业级可视化布局"""
-    plt.figure(figsize=(15, 10))
+def visualize_prototypes(embeddings, labels, titles):
+    """极简专业风格可视化"""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8), facecolor='white')
 
-    # 绘制三组数据
-    for i in range(3):
-        mask = (labels == i)
-        plt.scatter(
-            embeddings[mask, 0],
-            embeddings[mask, 1],
-            c=VisualConfig.colors[i],
-            marker=VisualConfig.markers[i],
-            s=VisualConfig.sizes[i],
-            alpha=VisualConfig.alphas[i],
+    # 隐藏坐标轴元素
+    for ax in [ax1, ax2]:
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.spines[:].set_color('black')  # 保留框线
+        ax.spines[:].set_linewidth(0.8)
+
+    # 绘制左子图（Proof组）
+    proof_indices = np.where(labels == 0)[0]
+    for i in range(10):
+        segment = proof_indices[i * 10: (i + 1) * 10]
+        ax1.scatter(
+            embeddings[segment, 0], embeddings[segment, 1],
+            c=[VisualConfig.color_maps[0]],
+            marker=VisualConfig.markers[0],
+            s=VisualConfig.sizes[0],
+            alpha=1,
             edgecolors='w',
             linewidths=0.8,
-            label=VisualConfig.labels[i]
+            label=VisualConfig.labels[0] if i == 0 else ""
         )
+    # --- 子图标题配置 ---
+    ax1.text(0.5, -0.12,  # 调整y坐标位置
+             f'({titles[0][0]}) {titles[0][1]}',
+             transform=ax1.transAxes,  # 使用当前轴的坐标系
+             ha='center', va='top', fontsize=18)
 
-    # 高级图例配置
-    legend = plt.legend(
-        title='Prototype Groups',
-        title_fontsize=12,
-        fontsize=10,
-        loc='upper right',  # 图例位置
-        bbox_to_anchor=(0.98, 0.98),  # 微调锚点
-        frameon=True,
-        framealpha=0.9,  # 背景透明度
-    )
-    legend.get_frame().set_edgecolor('black')  # 边框颜色
-    legend.get_frame().set_linewidth(0.5)  # 边框宽度
+    # 绘制右子图（Ours + ETF）
+    for group, offset in [(1, 0), (2, 10)]:
+        group_indices = np.where(labels == group)[0]
+        for i in range(10):
+            segment = group_indices[i * 10: (i + 1) * 10]
+            ax2.scatter(
+                embeddings[segment, 0], embeddings[segment, 1],
+                c=[VisualConfig.color_maps[group - 1]],
+                marker=VisualConfig.markers[group],
+                s=VisualConfig.sizes[group],
+                alpha=1,
+                edgecolors='w',
+                linewidths=0.8,
+                label=VisualConfig.labels[group] if i == 0 else ""
+            )
+    # --- 子图标题配置 ---
+    ax2.text(0.5, -0.12,  # 保持相同偏移量
+             f'({titles[1][0]}) {titles[1][1]}',
+             transform=ax2.transAxes,  # 使用当前轴的坐标系
+             ha='center', va='top', fontsize=18)
 
-    # 坐标轴美化
-    # plt.xlabel("t-SNE 1", fontsize=12)
-    # plt.ylabel("t-SNE 2", fontsize=12)
-    # plt.title("Prototype Distribution Comparison", fontsize=14, pad=20)
-    plt.grid(alpha=0.2)
-    ax = plt.gca()
-    ax.set_xticks([])
-    ax.set_yticks([])
-    # 设置边框颜色和线宽
-    for spine in ax.spines.values():
-        spine.set_color('black')
-        spine.set_linewidth(0.8)
-
-    # 输出设置
+    # 调整布局边距
+    plt.subplots_adjust(bottom=0.15)  # 增加底部边距
     plt.tight_layout()
+
     plt.savefig('prototype_comparison.png', dpi=300, bbox_inches='tight')
     plt.savefig("prototype_comparison.pdf", format="pdf", bbox_inches='tight', dpi=300)
-    # plt.show()
-
-
+    plt.close()
 # ===================== 主流程 =====================
 def main():
-    # 数据准备
     combined_data, labels = load_and_preprocess()
+
+    # 数据标准化
+    from sklearn.preprocessing import StandardScaler
+    combined_data = StandardScaler().fit_transform(combined_data)
 
     # 执行t-SNE
     print("Running t-SNE...")
@@ -108,7 +119,7 @@ def main():
     embeddings = tsne.fit_transform(combined_data)
 
     # 可视化
-    visualize_prototypes(embeddings, labels)
+    visualize_prototypes(embeddings, labels,titles=[('a', 'Proof'), ('b', 'Our Method')])
 
 
 if __name__ == "__main__":

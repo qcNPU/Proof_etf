@@ -38,7 +38,6 @@ def setup_parser():
     parser.add_argument('--text_optimize', type=str, default='loop',choices=['loop','optimize'], help='Json file of settings.')
     parser.add_argument('--save_proto', type=bool, default=False, help='Json file of settings.')
     parser.add_argument('--optimize_feat', type=str, default='textimage',choices=['textimage','text','image'], help='Json file of settings.')
-    parser.add_argument('--common_match', type=str, default='common',choices=['common','differ'], help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/ncscmp.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/cub.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/car.json', help='Json file of settings.')
@@ -47,13 +46,13 @@ def setup_parser():
 
 import numpy as np
 def getmeanstd():
-    avg_results =[94.349, 94.748, 93.301]
+    avg_results =[88.232, 87.77799999999999, 88.225]
     # avg_results = [avg_results[i] for i in [0,1,3]]
     # avg_results = [avg_results[i] for i in [1,2,8]]
     A_mean,A_std = np.mean(avg_results),np.std(avg_results)
     print(f"{A_mean:.2f}±{A_std:.2f}")
     # print(f"{A_mean}±{A_std}")
-    last_results =[90.64, 90.88, 90.72]
+    last_results =[81.58, 81.95, 82.19]
     # last_results = [last_results[i] for i in [0,1,3]]
     # last_results = [last_results[i] for i in [1,2,8]]
     ABmean,ABstd = np.mean(last_results),np.std(last_results)

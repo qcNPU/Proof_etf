@@ -23,8 +23,6 @@ class Learner(BaseLearner):
         self.text_optimize = get_attribute(args,"text_optimize", "loop")
         self.target_choose = get_attribute(args,"target_choose", "reselect")
         self.target_match = get_attribute(args, "target_match", "cosine")
-        if self.target_match == "random":
-            self.target_choose = "fix"
         self.optimize_feat = get_attribute(args,"optimize_feat", "textimage")
         self.increment = get_attribute(args,"increment", 10)
         self.proto_num = get_attribute(args,"proto_num", 4)
@@ -167,14 +165,15 @@ class Learner(BaseLearner):
                     loss_etf1 = torch.zeros((1,), requires_grad=True).to(self._device)
                     loss_etf2 = torch.zeros((1,), requires_grad=True).to(self._device)
                     if 'text' in self.optimize_feat:
-                        loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class,'text')["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                        loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     if 'image' in self.optimize_feat:
                         if "mp" in self.setting:
-                            loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po,:].squeeze(1), seen_class,'image')["loss"] for po in range(self.proto_num)])
+                            loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po,:].squeeze(1), seen_class)["loss"] for po in range(self.proto_num)])
                             # loss_etf2 = self._network.eft_head.forward_train_v1(proto_features.mean(1), seen_class)["loss"]
                         else:
-                            loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class,'image')["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                            loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     # loss_etf3 = self._network.eft_head.forward_train_v1(image_features, [i.item() for i in targets])["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
+                    # loss_etf2+=loss_etf3
                     loss_etf = self.ncloss*(loss_etf1+loss_etf2)
 
                 if "scmp" in self.setting: #supcontrast loss

@@ -74,7 +74,9 @@ def visualize_dual_pdf(embeddings_list, labels_list, titles, output_name="dual_m
             )
 
         plt.tight_layout()
-        pdf.savefig(bbox_inches='tight')
+        # pdf.savefig(bbox_inches='tight')
+        plt.savefig('feat-proto_comparison.png', dpi=300, bbox_inches='tight')
+        plt.savefig("feat-proto_comparison.pdf", format="pdf", bbox_inches='tight', dpi=300)
         plt.close()
 
 class VisualConfig:
@@ -99,12 +101,12 @@ class VisualConfig:
     # t-SNE参数
     tsne_params = {
         'n_components': 2,
-        'perplexity': 50,        # 增大perplexity以分散全局结构
-        'n_iter': 5000,          # 增加迭代次数确保收敛
-        'learning_rate': 500,    # 增大学习率避免局部最优
+        'perplexity': 30,        # 增大perplexity以分散全局结构
+        'n_iter': 2000,          # 增加迭代次数确保收敛
+        'learning_rate': 300,    # 增大学习率避免局部最优
         'metric': 'cosine',
         'random_state': 42,
-        'early_exaggeration': 24 # 增强前期簇分离
+        # 'early_exaggeration': 24 # 增强前期簇分离
     }
 
 
@@ -152,12 +154,11 @@ def load_and_preprocess(setting):
     proto_labels = np.repeat(np.arange(num_classes), num_prototypes) + 10  # (10*N,)
     combined_labels = np.concatenate([feature_labels, proto_labels])  # (200+10N,)
     # 先进行PCA降维到50维
-    from sklearn.decomposition import PCA
-    pca = PCA(n_components=25)
-    combined_data_pca = pca.fit_transform(combined_data)
+    # from sklearn.decomposition import PCA
+    # pca = PCA(n_components=90)
+    # combined_data = pca.fit_transform(combined_data)
 
-    return StandardScaler().fit_transform(combined_data_pca), combined_labels, num_prototypes, setting
-    # return StandardScaler().fit_transform(combined_data), combined_labels,num_prototypes,setting
+    return StandardScaler().fit_transform(combined_data), combined_labels, num_prototypes, setting
 
 
 def main():
