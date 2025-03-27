@@ -24,10 +24,6 @@
 		"a photo of the large {}.",
 		"a {} in a video game.",
 		"art of the {}.",
-		"a black and white photo of the {}.",
-        "a low contrast photo of the {}.",
-		"a drawing of the {}.",
-        "a high contrast photo of the {}.",
 		"a photo of the small {}."
     ],
     "food101": [
@@ -62,10 +58,6 @@
 		"a photo of the large {}.",
 		"a {} in a video game.",
 		"art of the {}.",
-		"a black and white photo of the {}.",
-        "a low contrast photo of the {}.",
-		"a drawing of the {}.",
-        "a high contrast photo of the {}.",
 		"a photo of the small {}."
     ]
 }

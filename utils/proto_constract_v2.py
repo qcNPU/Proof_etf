@@ -7,7 +7,18 @@ from sklearn.manifold import TSNE
 # ===================== 配置参数 =====================
 class VisualConfig:
     # 颜色配置（每个组生成10种渐变色）
-    color_maps = ['#FF0000', '#0000FF', '#000000'] # 红，蓝，绿
+    color_maps = [
+    "#FF0000",  # 纯红 (最高对比)
+    "#00FF00",  # 纯绿
+    "#0000FF",  # 纯蓝
+    "#FFFF00",  # 纯黄
+    "#FF00FF",  # 品红
+    "#00FFFF",  # 青色
+    "#FF8000",  # 橙
+    "#800080",  # 紫
+    "#008000",  # 深绿
+    "#FF1493"   # 亮粉
+] # 红，蓝，绿
     markers = ['o', 'o', '*']  # 圆形，圆形，星形
     sizes = [100, 100, 120]  # 标记尺寸
     alphas = [1, 1, 1]  # 完全不透明
@@ -63,7 +74,7 @@ def visualize_prototypes(embeddings, labels, titles):
         segment = proof_indices[i * 10: (i + 1) * 10]
         ax1.scatter(
             embeddings[segment, 0], embeddings[segment, 1],
-            c=[VisualConfig.color_maps[0]],
+            c=[VisualConfig.color_maps[i]],
             marker=VisualConfig.markers[0],
             s=VisualConfig.sizes[0],
             alpha=1,
@@ -84,7 +95,7 @@ def visualize_prototypes(embeddings, labels, titles):
             segment = group_indices[i * 10: (i + 1) * 10]
             ax2.scatter(
                 embeddings[segment, 0], embeddings[segment, 1],
-                c=[VisualConfig.color_maps[group - 1]],
+                c=[VisualConfig.color_maps[i]] if group ==1 else 'black',
                 marker=VisualConfig.markers[group],
                 s=VisualConfig.sizes[group],
                 alpha=1,
@@ -102,8 +113,8 @@ def visualize_prototypes(embeddings, labels, titles):
     plt.subplots_adjust(bottom=0.15)  # 增加底部边距
     plt.tight_layout()
 
-    plt.savefig('prototype_comparison.png', dpi=300, bbox_inches='tight')
-    plt.savefig("prototype_comparison.pdf", format="pdf", bbox_inches='tight', dpi=300)
+    plt.savefig('/home/qc/python_tool/prototype_tsne.png', dpi=300, bbox_inches='tight')
+    plt.savefig("/home/qc/python_tool/result/prototype_tsne.pdf", format="pdf", bbox_inches='tight', dpi=300)
     plt.close()
 # ===================== 主流程 =====================
 def main():
