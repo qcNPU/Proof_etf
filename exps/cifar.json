@@ -5,8 +5,6 @@
     "memory_per_class": 20,
     "fixed_memory": false,
     "shuffle": true,
-    "init_cls": 10,
-    "increment": 10,
     "model_name": "proof",
     "device": [ "0"],
     "seed": [1993,7,999],

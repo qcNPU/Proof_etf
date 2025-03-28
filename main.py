@@ -27,6 +27,8 @@ def setup_parser():
     parser.add_argument('--setting', type=str, default='proofncscmp', help='Json file of settings.')
     # parser.add_argument('--setting', type=str, default='proof', help='Json file of settings.')
     parser.add_argument('--gen_proto_mode', type=str, default='kmeans++', help='Json file of settings.')
+    parser.add_argument('--init_cls', type=int, default=10, help='Json file of settings.')
+    parser.add_argument('--increment', type=int, default=10, help='Json file of settings.')
     parser.add_argument('--proto_num', type=int, default=5, help='Json file of settings.')
     parser.add_argument('--ncloss', type=int, default=5, help='Json file of settings.')
     parser.add_argument('--scmploss', type=int, default=3, help='Json file of settings.')
@@ -52,20 +54,12 @@ def getmeanstd():
     A_mean,A_std = np.mean(avg_results),np.std(avg_results)
     print(f"{A_mean:.2f}±{A_std:.2f}")
     # print(f"{A_mean}±{A_std}")
-    last_results =[81.58, 81.95, 82.19]
+    last_results =[77.03, 76.72, 76.65]
     # last_results = [last_results[i] for i in [0,1,3]]
     # last_results = [last_results[i] for i in [1,2,8]]
     ABmean,ABstd = np.mean(last_results),np.std(last_results)
     # print(f"{ABmean}±{ABstd}")
     print(f"{ABmean:.2f}±{ABstd:.2f}")
-
-
-
-def getSub():
-    AB_1 = [81.11, 81.62, 81.48, 81.0, 81.5, 81.01, 81.08, 81.45, 81.4, 81.57]
-    AB_2 = [77.27, 77.72, 78.43, 77.3, 77.35, 78.59, 77.36, 77.68, 77.4, 78.01]
-    c = [i-j for (i,j) in zip(AB_1,AB_2)]
-    print(f"{c}")
 
 
 if __name__ == '__main__':

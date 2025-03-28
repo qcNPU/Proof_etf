@@ -6,8 +6,6 @@
     "num_classes": 200,
     "fixed_memory": false,
     "shuffle": true,
-    "init_cls": 20,
-    "increment": 20,
     "model_name": "proof",
     "device": [ "0"],
     "seed": [1993,2003,999],
