@@ -40,6 +40,7 @@ def setup_parser():
     parser.add_argument('--text_optimize', type=str, default='loop',choices=['loop','optimize'], help='Json file of settings.')
     parser.add_argument('--save_proto', type=bool, default=False, help='Json file of settings.')
     parser.add_argument('--optimize_feat', type=str, default='textimage',choices=['textimage','text','image'], help='Json file of settings.')
+    parser.add_argument('--proto_select', type=str, default='max',choices=['max','maxmin','minmax', 'min'], help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/ncscmp.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/cub.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/car.json', help='Json file of settings.')

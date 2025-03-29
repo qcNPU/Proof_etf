@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from .toolkit import *
 
@@ -79,7 +80,7 @@ def multiproto_max(image_features,proto_features,targets):
     return protoloss
 
 
-def get_similar_proto(image_features,proto_features):
+def get_similar_proto1(image_features,proto_features, proto_select=None, labels=None):
     img_expanded = image_features.unsqueeze(1).expand(-1, proto_features.shape[1], -1).unsqueeze(1).expand(-1, proto_features.shape[0], -1, -1)  # 扩展 A 为 (64, 3, 512)
     proto_expanded = proto_features.unsqueeze(0).expand(image_features.shape[0], -1, -1, -1)  # 扩展为 (64, 10, 3, 512)
     # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
@@ -87,6 +88,46 @@ def get_similar_proto(image_features,proto_features):
 
     max_sim_values, final_sim_indices = cos_sim.max(dim=2)  # 64，,10
     proto_features = proto_features[range(proto_features.shape[0]), final_sim_indices]  # 选择每个样本最相似的向量 64，10，,512
+    return proto_features
+
+def get_similar_proto(image_features, proto_features, proto_select=None, labels=None):
+    batch_size = image_features.size(0)
+    num_classes = proto_features.size(0)
+    num_prototypes = proto_features.size(1)
+    feature_dim = proto_features.size(2)
+
+    # 扩展维度以计算所有样本与所有原型的相似度
+    img_expanded = image_features.view(batch_size, 1, 1, feature_dim)  # (B, 1, 1, D)
+    proto_expanded = proto_features.view(1, num_classes, num_prototypes, feature_dim)  # (1, C, P, D)
+    # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
+    cos_sim = F.cosine_similarity(img_expanded, proto_expanded, dim=-1)  # 输出的形状是 (64,10, 3)
+
+    # 获取每个类别的最大和最小相似度索引
+    max_sim_values, max_indices = cos_sim.max(dim=2)
+    min_sim_values, min_indices = cos_sim.min(dim=2)
+
+    # 根据选择策略确定索引
+    if proto_select == 'max':
+        selected_indices = max_indices
+    elif proto_select == 'maxmin':  #正确类别选最大，其他选最小
+        mask = torch.zeros((batch_size, num_classes), dtype=torch.bool, device=image_features.device)
+        mask.scatter_(1, labels.unsqueeze(1), True)    #mask (batch_size, num_classes)，其中每个样本的真实类别的位置是True，其他是False
+        # 原位赋值：默认用 min_indices，mask对应的位置（真实类别）替换成max_indices的值
+        selected_indices = min_indices.clone()
+        selected_indices[mask] = max_indices[mask]
+    elif proto_select == 'minmax':
+        mask = torch.zeros((batch_size, num_classes), dtype=torch.bool, device=image_features.device)
+        mask.scatter_(1, labels.unsqueeze(1), True)    # 原位赋值：默认用 min_indices，仅替换 mask 位置为 max_indices
+        selected_indices = max_indices.clone()
+        selected_indices[mask] = min_indices[mask]
+    elif proto_select == 'min':
+        selected_indices = min_indices
+    else:
+        raise ValueError("proto_select must be 0, 1, 2, 3 or None")
+
+    # 正确索引原型
+    proto_features = proto_features[range(proto_features.shape[0]), selected_indices]  # 选择每个样本最相似的向量 64，10，,512
+
     return proto_features
 
 

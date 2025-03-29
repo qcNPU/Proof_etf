@@ -4,17 +4,17 @@
 
 # 定义所有任务（格式：命令:日志文件）
 ALL_TASKS=(
-    "python -u main.py --config ./exps/cifar.json --setting proofncscmp --init_cls 50 --increment 10:result/cifar_ncscmp_one_50-10.log"
-    "python -u main.py --config ./exps/cifar.json --setting proofncscmp --init_cls 5 --increment 5:result/cifar_ncscmp_one_0-5.log"
-    "python -u main.py --config ./exps/cifar.json --setting proofncscmp --init_cls 20 --increment 20:result/cifar_ncscmp_one_0-20.log"
+    "python -u main.py --config ./exps/cifar.json --setting proofncscmp --init_cls 10 --increment 10 --proto_select maxmin:result/cifar_proofncscmp_one_maxmin.log"
+    "python -u main.py --config ./exps/cifar.json --setting proofncscmp --init_cls 10 --increment 10 --proto_select minmax:result/cifar_proofncscmp_one_minmax.log"
+    "python -u main.py --config ./exps/cifar.json --setting proofncscmp --init_cls 10 --increment 10 --proto_select min:result/cifar_proofncscmp_one_min.log"
     #
-    "python -u main.py --config ./exps/imgnetsub.json --setting proofncscmp --init_cls 50 --increment 10:result/imgnetsub_ncscmp_one_50-10.log"
-    "python -u main.py --config ./exps/imgnetsub.json --setting proofncscmp --init_cls 5 --increment 5:result/imgnetsub_ncscmp_one_0-5.log"
-    "python -u main.py --config ./exps/imgnetsub.json --setting proofncscmp --init_cls 20 --increment 20:result/imgnetsub_ncscmp_one_0-20.log"
+    "python -u main.py --config ./exps/imgnetsub.json --setting proofncscmp --init_cls 10 --increment 10 --proto_select maxmin:result/imgnetsub_proofncscmp_one_maxmin.log"
+    "python -u main.py --config ./exps/imgnetsub.json --setting proofncscmp --init_cls 10 --increment 10 --proto_select minmax:result/imgnetsub_proofncscmp_one_minmax.log"
+    "python -u main.py --config ./exps/imgnetsub.json --setting proofncscmp --init_cls 10 --increment 10 --proto_select min:result/imgnetsub_proofncscmp_one_min.log"
     #
-    "python -u main.py --config ./exps/tinyimagenet.json --setting proofncscmp --init_cls 40 --increment 40:result/tinyimagenet_ncscmp_one_0-40.log"
-    "python -u main.py --config ./exps/tinyimagenet.json --setting proofncscmp --init_cls 100 --increment 20:result/tinyimagenet_ncscmp_one_100-20.log"
-    "python -u main.py --config ./exps/tinyimagenet.json --setting proofncscmp --init_cls 10 --increment 10:result/tinyimagenet_ncscmp_one_0-10.log"
+    "python -u main.py --config ./exps/tinyimagenet.json --setting proofncscmp --init_cls 20 --increment 20 --proto_select maxmin:result/tinyimagenet_proofncscmp_one_maxmin.log"
+    "python -u main.py --config ./exps/tinyimagenet.json --setting proofncscmp --init_cls 20 --increment 20 --proto_select minmax:result/tinyimagenet_proofncscmp_one_minmax.log"
+    "python -u main.py --config ./exps/tinyimagenet.json --setting proofncscmp --init_cls 20 --increment 20 --proto_select min:result/tinyimagenet_proofncscmp_one_min.log"
 )
 
 # 初始化 4 个 GPU 组的任务列表

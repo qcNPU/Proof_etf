@@ -74,7 +74,7 @@ def visualize_prototypes(embeddings, labels, titles):
         segment = proof_indices[i * 10: (i + 1) * 10]
         ax1.scatter(
             embeddings[segment, 0], embeddings[segment, 1],
-            c=[VisualConfig.color_maps[i]],
+            c=[VisualConfig.color_maps[0]],
             marker=VisualConfig.markers[0],
             s=VisualConfig.sizes[0],
             alpha=1,
@@ -95,7 +95,7 @@ def visualize_prototypes(embeddings, labels, titles):
             segment = group_indices[i * 10: (i + 1) * 10]
             ax2.scatter(
                 embeddings[segment, 0], embeddings[segment, 1],
-                c=[VisualConfig.color_maps[i]] if group ==1 else 'black',
+                c=[VisualConfig.color_maps[1]] if group ==1 else 'black',
                 marker=VisualConfig.markers[group],
                 s=VisualConfig.sizes[group],
                 alpha=1,

@@ -24,6 +24,7 @@ class Learner(BaseLearner):
         self.target_choose = get_attribute(args,"target_choose", "reselect")
         self.target_match = get_attribute(args, "target_match", "cosine")
         self.optimize_feat = get_attribute(args,"optimize_feat", "textimage")
+        self.proto_select = get_attribute(args,"proto_select", "max")
         self.increment = get_attribute(args,"increment", 10)
         self.proto_num = get_attribute(args,"proto_num", 4)
         self.seed = get_attribute(args,"seed", 1993)
@@ -179,7 +180,7 @@ class Learner(BaseLearner):
                 if "scmp" in self.setting: #supcontrast loss
                     # suploss = SupConLossMultiProto()  #这个效果不如SupConLoss， 尝试多prototype选择最好的，然后用下面的单prototype
                     # protoloss = suploss(image_features,proto_features,targets)
-                    proto_features = get_similar_proto(image_features,proto_features)
+                    proto_features = get_similar_proto(image_features,proto_features,self.proto_select,targets)
                     suploss = Suploss_batchproto()
                     protoloss = self.scmploss * suploss(image_features, proto_features, targets)
                 elif "sc" in self.setting: #supcontrast loss
@@ -321,8 +322,8 @@ class Learner(BaseLearner):
                 transf_image_features, transf_text_features, _, proto_feas = self._network.forward_transformer(
                     image_features, text_features,self._train_transformer,use_multi_proto=use_multi_proto)
                 if "mp" in self.setting or use_multi_proto:
-                    img_expanded = transf_image_features.unsqueeze(1).expand(-1, proto_feas.shape[1], -1).unsqueeze(1).expand(-1, proto_feas.shape[0], -1, -1)  # 扩展 A 为 (64, 3, 512)
-                    proto_expanded = proto_feas.unsqueeze(0).expand(transf_image_features.shape[0], -1, -1, -1)  # 扩展为 (64, 10, 3, 512)
+                    img_expanded = transf_image_features.view(transf_image_features.shape[0], 1, 1, proto_feas.shape[2])  # (B, 1, 1, D)
+                    proto_expanded = proto_feas.view(1, proto_feas.shape[0], proto_feas.shape[1], proto_feas.shape[2])  # (1, C, P, D)
                     # 计算余弦相似度：A_expanded 和 B 的形状是 (64, 3, 512)，我们可以计算它们的点积
                     cos_sim = F.cosine_similarity(img_expanded, proto_expanded, dim=-1)  # 输出的形状是 (64, 3)
                     # 从每个样本中选择最大相似度的索引
