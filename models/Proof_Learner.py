@@ -25,6 +25,8 @@ class Learner(BaseLearner):
         self.target_match = get_attribute(args, "target_match", "cosine")
         self.optimize_feat = get_attribute(args,"optimize_feat", "textimage")
         self.proto_select = get_attribute(args,"proto_select", "max")
+        self.prediction = get_attribute(args,"prediction", "pmvmtm")
+        self.lossteam = get_attribute(args,"lossteam", "pmvmtmncscmp")
         self.increment = get_attribute(args,"increment", 10)
         self.proto_num = get_attribute(args,"proto_num", 4)
         self.seed = get_attribute(args,"seed", 1993)
@@ -336,9 +338,17 @@ class Learner(BaseLearner):
                 else:
                     proto_outputs= transf_image_features @ proto_feas.T
 
-                outputs = transf_image_features @ transf_text_features.T
+                tmoutputs = transf_image_features @ transf_text_features.T
                 original_outputs= image_features @ text_features.T
-                outputs = original_outputs+outputs+proto_outputs
+                # outputs = original_outputs+tmoutputs+proto_outputs
+
+                outputs = torch.zeros_like(proto_outputs)
+                if 'pm' in self.prediction:
+                    outputs += original_outputs
+                if 'vm' in self.prediction:
+                    outputs += proto_outputs
+                if 'tm' in self.prediction:
+                    outputs += tmoutputs
 
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == targets).sum()
