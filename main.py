@@ -42,9 +42,8 @@ def setup_parser():
     parser.add_argument('--optimize_feat', type=str, default='textimage',choices=['textimage','text','image'], help='Json file of settings.')
     parser.add_argument('--proto_select', type=str, default='max',choices=['max','maxmin','minmax', 'min'], help='Json file of settings.')
     parser.add_argument('--prediction', type=str, default='pmvmtm',choices=['pmvmtm','pm','vm', 'tm','pmvm','pmtm','vmtm'], help='Json file of settings.')
-    parser.add_argument('--lossteam', type=str, default='pmvmtm',choices=['pmvmtmncscmp', 'pm','vm','tm','nc','scmp', 'pmvm','pmtm','pmnc','pmscmp',
-                                                                          'vmtm','vmnc','vmscmp','tmnc','tmscmp','ncscmp','pmvmnc','pmvmscmp','pmtmnc',
-                                                                          'pmtmscmp','vmtmnc','vmtmscmp','tmncscmp','pmvmtmnc','pmvmtmscmp','vmtmncscmp'], help='Json file of settings.')
+    parser.add_argument('--lossteam', type=str, default='pmtmncscmp',choices=['pmtmncscmp', 'pm','tm','nc','scmp', 'pmtm','pmnc','pmscmp',
+                                                                          'tmnc','tmscmp','ncscmp','pmtmnc', 'pmtmscmp','pmncscmp','tmncscmp'], help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/ncscmp.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/cub.json', help='Json file of settings.')
     # parser.add_argument('--config', type=str, default='./exps/car.json', help='Json file of settings.')

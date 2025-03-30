@@ -165,13 +165,16 @@ class Learner(BaseLearner):
                     use_multi_proto=use_multi_proto)
                 if "nc" in self.setting:
                     # 把 text feature 往 ETF 上去拉，根据特征相似度来取对应的 target
-                    loss_etf1 = torch.zeros((1,), requires_grad=True).to(self._device)
-                    loss_etf2 = torch.zeros((1,), requires_grad=True).to(self._device)
+                    loss_etf1 = torch.tensor(0.0, device=self._device)
+                    loss_etf2 = torch.tensor(0.0, device=self._device)
                     if 'text' in self.optimize_feat:
                         loss_etf1 = self._network.eft_head.forward_train_v1(text_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
                     if 'image' in self.optimize_feat:
                         if "mp" in self.setting:
-                            loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po,:].squeeze(1), seen_class)["loss"] for po in range(self.proto_num)])
+                            # loss_etf2 = sum([self._network.eft_head.forward_train_v1(proto_features[:,po,:].squeeze(1), seen_class)["loss"] for po in range(self.proto_num)])
+                            # 最优方案（兼顾效率和可维护性）
+                            per_proto = proto_features.permute(1, 0, 2).contiguous()  # 必须保留.contiguous()
+                            loss_etf2 = torch.stack([self._network.eft_head.forward_train_v1(per_proto[po], seen_class)["loss"] for po in range(self.proto_num)]).sum()
                             # loss_etf2 = self._network.eft_head.forward_train_v1(proto_features.mean(1), seen_class)["loss"]
                         else:
                             loss_etf2 = self._network.eft_head.forward_train_v1(proto_features, seen_class)["loss"]   #把 text feature 往随机初始化的 etf 上拉没有效果
@@ -215,12 +218,19 @@ class Learner(BaseLearner):
 
                 loss = F.cross_entropy(logits, targets)
 
-                if "nc" in self.setting:
-                    # print(f"loss:{loss},clip_loss:{clip_loss},protoloss:{protoloss}, loss_etf:{loss_etf}")
-                    total_loss = loss+clip_loss+protoloss + loss_etf
-                else:
-                    # print(f"loss:{loss},clip_loss:{clip_loss},protoloss:{protoloss}")
-                    total_loss = loss+clip_loss+protoloss
+                total_loss = torch.tensor(0.0, device=self._device)
+                if 'pm' in self.lossteam:
+                    total_loss += clip_loss
+                if 'tm' in self.lossteam:
+                    total_loss += loss
+                if 'nc' in self.lossteam:
+                    total_loss += loss_etf
+                if 'scmp' in self.lossteam:
+                    total_loss += protoloss
+                # if "nc" in self.setting:
+                #     total_loss = loss+clip_loss+protoloss + loss_etf
+                # else:
+                #     total_loss = loss+clip_loss+protoloss
 
                 optimizer.zero_grad()
                 total_loss.backward()
