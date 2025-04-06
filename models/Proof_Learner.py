@@ -218,19 +218,19 @@ class Learner(BaseLearner):
 
                 loss = F.cross_entropy(logits, targets)
 
-                total_loss = torch.tensor(0.0, device=self._device)
-                if 'pm' in self.lossteam:
-                    total_loss += clip_loss
-                if 'tm' in self.lossteam:
-                    total_loss += loss
-                if 'nc' in self.lossteam:
-                    total_loss += loss_etf
-                if 'scmp' in self.lossteam:
-                    total_loss += protoloss
-                # if "nc" in self.setting:
-                #     total_loss = loss+clip_loss+protoloss + loss_etf
-                # else:
-                #     total_loss = loss+clip_loss+protoloss
+                # total_loss = torch.tensor(0.0, device=self._device)
+                # if 'pm' in self.lossteam:
+                #     total_loss += clip_loss
+                # if 'tm' in self.lossteam:
+                #     total_loss += loss
+                # if 'nc' in self.lossteam:
+                #     total_loss += loss_etf
+                # if 'scmp' in self.lossteam:
+                #     total_loss += protoloss
+                if "nc" in self.setting:
+                    total_loss = loss+clip_loss+protoloss + loss_etf
+                else:
+                    total_loss = loss+clip_loss+protoloss
 
                 optimizer.zero_grad()
                 total_loss.backward()
@@ -350,15 +350,15 @@ class Learner(BaseLearner):
 
                 tmoutputs = transf_image_features @ transf_text_features.T
                 original_outputs= image_features @ text_features.T
-                # outputs = original_outputs+tmoutputs+proto_outputs
+                outputs = original_outputs+tmoutputs+proto_outputs
 
-                outputs = torch.zeros_like(proto_outputs)
-                if 'pm' in self.prediction:
-                    outputs += original_outputs
-                if 'vm' in self.prediction:
-                    outputs += proto_outputs
-                if 'tm' in self.prediction:
-                    outputs += tmoutputs
+                # outputs = torch.zeros_like(proto_outputs)
+                # if 'pm' in self.prediction:
+                #     outputs += original_outputs
+                # if 'vm' in self.prediction:
+                #     outputs += proto_outputs
+                # if 'tm' in self.prediction:
+                #     outputs += tmoutputs
 
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == targets).sum()
