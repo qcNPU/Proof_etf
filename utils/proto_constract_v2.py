@@ -8,7 +8,7 @@ from sklearn.manifold import TSNE
 class VisualConfig:
     color_maps = ['red', 'red', 'black']  # Proof, Ours, ETF
     markers = ['o', 'o', '*']  # 标记类型
-    sizes = [80, 80, 80]  # 尺寸
+    sizes = [100, 100, 100]  # 尺寸
     alphas = [1.0, 1.0, 1.0]  # 透明度
     labels = ['Proof', 'Ours', 'ETF']  # 图例
 
