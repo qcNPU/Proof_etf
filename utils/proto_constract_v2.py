@@ -74,134 +74,114 @@ def draw_focus_boxes(ax, box_type, color='blue', linestyle='--'):
     ))
 
 
-def visualize_prototypes(embeddings, labels, titles):
-    """极简专业风格可视化（修复框线错位问题）"""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+def visualize_combined(embeddings, labels, titles):
+    """合并原图和放大图为两行布局"""
+    fig, axs = plt.subplots(2, 2, figsize=(22, 16))  # 2行2列布局
+    plt.subplots_adjust(wspace=0.15, hspace=0.25)  # 调整子图间距
 
+    # ===================== 第一行：原图 =====================
     # ---- 左子图：Proof组 ----
     proof_idx = np.where(labels == 0)[0]
-    ax1.scatter(
+    axs[0, 0].scatter(
         embeddings[proof_idx, 0], embeddings[proof_idx, 1],
         c=VisualConfig.color_maps[0],
         marker=VisualConfig.markers[0],
-        s=VisualConfig.sizes[0]*1.1,
+        s=VisualConfig.sizes[0] * 1.1,
         alpha=VisualConfig.alphas[0],
         edgecolors='w',
         linewidths=0.8
     )
-
-    # 设置左图坐标范围
     x_min, x_max = embeddings[proof_idx, 0].min(), embeddings[proof_idx, 0].max()
     y_min, y_max = embeddings[proof_idx, 1].min(), embeddings[proof_idx, 1].max()
-    ax1.set_xlim(x_min - 0.05 * (x_max - x_min), x_max + 0.05 * (x_max - x_min))
-    ax1.set_ylim(y_min - 0.05 * (y_max - y_min), y_max + 0.05 * (y_max - y_min))
-
-    # 添加左图聚焦框（关键修改点）
-    draw_focus_boxes(ax1, box_type='left')  # 明确指定框类型
+    axs[0, 0].set_xlim(x_min - 0.05 * (x_max - x_min), x_max + 0.05 * (x_max - x_min))
+    axs[0, 0].set_ylim(y_min - 0.05 * (y_max - y_min), y_max + 0.05 * (y_max - y_min))
+    draw_focus_boxes(axs[0, 0], box_type='left')
 
     # ---- 右子图：Ours + ETF ----
-    ours_idx = np.where(labels == 1)[0]
-    etf_idx = np.where(labels == 2)[0]
-    combined_idx = np.concatenate([ours_idx, etf_idx])
-    print("Proof组坐标范围:", embeddings[proof_idx].min(axis=0), embeddings[proof_idx].max(axis=0))
-    print("Ours+ETF坐标范围:", embeddings[combined_idx].min(axis=0), embeddings[combined_idx].max(axis=0))
-
-    for i in [1, 2]:  # 分别绘制Ours和ETF
+    for i in [1, 2]:
         idx = np.where(labels == i)[0]
-        ax2.scatter(
+        axs[0, 1].scatter(
             embeddings[idx, 0], embeddings[idx, 1],
             c=VisualConfig.color_maps[i],
             marker=VisualConfig.markers[i],
-            s=VisualConfig.sizes[i]*1.1,
+            s=VisualConfig.sizes[i] * 1.1,
             alpha=VisualConfig.alphas[i],
             linewidths=0.8
         )
-
-    # 设置右图坐标范围
+    combined_idx = np.concatenate([np.where(labels == 1)[0], np.where(labels == 2)[0]])
     x_min, x_max = embeddings[combined_idx, 0].min(), embeddings[combined_idx, 0].max()
     y_min, y_max = embeddings[combined_idx, 1].min(), embeddings[combined_idx, 1].max()
-    ax2.set_xlim(x_min - 0.05 * (x_max - x_min), x_max + 0.05 * (x_max - x_min))
-    ax2.set_ylim(y_min - 0.05 * (y_max - y_min), y_max + 0.05 * (y_max - y_min))
+    axs[0, 1].set_xlim(x_min - 0.05 * (x_max - x_min), x_max + 0.05 * (x_max - x_min))
+    axs[0, 1].set_ylim(y_min - 0.05 * (y_max - y_min), y_max + 0.05 * (y_max - y_min))
+    draw_focus_boxes(axs[0, 1], box_type='right')
 
-    # 添加右图聚焦框（关键修改点）
-    draw_focus_boxes(ax2, box_type='right')  # 明确指定框类型
-
-    # ---- 样式统一 ----
-    for ax in [ax1, ax2]:
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.spines[:].set_color('black')
-        ax.spines[:].set_linewidth(2)
-        ax.text(0.5, -0.08,
-                f'({titles[0][0] if ax == ax1 else titles[1][0]}) {titles[0][1] if ax == ax1 else titles[1][1]}',
-                transform=ax.transAxes, ha='center', va='top', fontsize=30,fontweight='bold')
-
-    plt.tight_layout()
-    plt.savefig('/home/qc/python_tool/prototype_tsne.png', dpi=300, bbox_inches='tight')
-    plt.savefig('/home/qc/python_tool/result/prototype_tsne.pdf', format="pdf", dpi=300, bbox_inches='tight')
-    plt.close()
-
-
-def visualize_zoomed(embeddings, labels, titles):
-    """放大视图可视化"""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
-
-    # 样式设置
-    for ax in [ax1, ax2]:
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.spines[:].set_color('black')
-        ax.spines[:].set_linewidth(2)
-
-    # 左子图：Proof组放大
+    # ===================== 第二行：放大图 =====================
+    # ---- 左子图：Proof组放大 ----
     left_box = VisualConfig.zoom_boxes['left']
-    proof_idx = np.where((labels == 0) &
-                         (embeddings[:, 0] >= left_box[0]) &
-                         (embeddings[:, 0] <= left_box[2]) &
-                         (embeddings[:, 1] >= left_box[1]) &
-                         (embeddings[:, 1] <= left_box[3]))[0]
-
-    ax1.scatter(
-        embeddings[proof_idx, 0], embeddings[proof_idx, 1],
+    proof_zoom_idx = np.where((labels == 0) &
+                              (embeddings[:, 0] >= left_box[0]) &
+                              (embeddings[:, 0] <= left_box[2]) &
+                              (embeddings[:, 1] >= left_box[1]) &
+                              (embeddings[:, 1] <= left_box[3]))[0]
+    axs[1, 0].scatter(
+        embeddings[proof_zoom_idx, 0], embeddings[proof_zoom_idx, 1],
         c=VisualConfig.color_maps[0],
         marker=VisualConfig.markers[0],
-        s=VisualConfig.sizes[0] * 3.5,  # 放大后适当增大标记
+        s=VisualConfig.sizes[0] * 3.5,
         alpha=VisualConfig.alphas[0],
         edgecolors='w',
         linewidths=0.8
     )
-    ax1.set_xlim(left_box[0], left_box[2])
-    ax1.set_ylim(left_box[1], left_box[3])
+    axs[1, 0].set_xlim(left_box[0], left_box[2])
+    axs[1, 0].set_ylim(left_box[1], left_box[3])
 
-    # 右子图：Ours + ETF放大
+    # ---- 右子图：Ours+ETF放大 ----
     right_box = VisualConfig.zoom_boxes['right']
-    for i, color in enumerate(VisualConfig.color_maps[1:], 1):
+    for i in [1, 2]:
         idx = np.where((labels == i) &
                        (embeddings[:, 0] >= right_box[0]) &
                        (embeddings[:, 0] <= right_box[2]) &
                        (embeddings[:, 1] >= right_box[1]) &
                        (embeddings[:, 1] <= right_box[3]))[0]
-
-        ax2.scatter(
+        axs[1, 1].scatter(
             embeddings[idx, 0], embeddings[idx, 1],
-            c=color,
+            c=VisualConfig.color_maps[i],
             marker=VisualConfig.markers[i],
-            s=VisualConfig.sizes[i] * 3.5,  # 放大后适当增大标记
+            s=VisualConfig.sizes[i] * 3.5,
             alpha=VisualConfig.alphas[i],
             linewidths=0.8
         )
-    ax2.set_xlim(right_box[0], right_box[2])
-    ax2.set_ylim(right_box[1], right_box[3])
+    axs[1, 1].set_xlim(right_box[0], right_box[2])
+    axs[1, 1].set_ylim(right_box[1], right_box[3])
 
-    # 添加标题
-    ax1.text(0.5, -0.08, f'({titles[0][0]}) {titles[0][1]} (Zoomed)',
-             transform=ax1.transAxes, ha='center', va='top', fontsize=30,fontweight='bold')
-    ax2.text(0.5, -0.08, f'({titles[1][0]}) {titles[1][1]} (Zoomed)',
-             transform=ax2.transAxes, ha='center', va='top', fontsize=30,fontweight='bold')
+    # ===================== 统一样式与标题 =====================
+    # 定义标题标签顺序
+    position_labels = [
+        [('a', 'Proof'), ('b', 'Our Method')],
+        [('c', 'Proof (Zoomed)'), ('d', 'Our Method (Zoomed)')]
+    ]
+
+    for i in range(2):
+        for j in range(2):
+            ax = axs[i, j]
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.spines[:].set_color('black')
+            ax.spines[:].set_linewidth(2)
+
+            # 根据行列索引获取标签
+            label, text = position_labels[i][j]
+            ax.text(0.5, -0.04,
+                    f'({label}) {text}',
+                    transform=ax.transAxes,
+                    ha='center',
+                    va='top',
+                    fontsize=28,
+                    fontweight='bold')
 
     plt.tight_layout()
-    plt.savefig('/home/qc/python_tool/prototype_tsne_zoomed.png', dpi=300, bbox_inches='tight')
-    plt.savefig("/home/qc/python_tool/result/prototype_tsne_zoomed.pdf", format="pdf", dpi=300)
+    plt.savefig('/home/qc/python_tool/combined_visualization.png', dpi=300, bbox_inches='tight')
+    plt.savefig('/home/qc/python_tool/result/combined_visualization.pdf', format='pdf', dpi=300)
     plt.close()
 
 
@@ -218,9 +198,8 @@ def main():
     tsne = TSNE(**VisualConfig.tsne_params)
     embeddings = tsne.fit_transform(combined_data)
 
-    # 可视化
-    visualize_prototypes(embeddings, labels, titles=[('a', 'Proof'), ('b', 'Our Method')])
-    visualize_zoomed(embeddings, labels, titles=[('c', 'Proof'), ('d', 'Our Method')])
+    # 使用合并后的可视化函数
+    visualize_combined(embeddings, labels, titles=[('a', 'Proof'), ('b', 'Our Method')])
 
 
 if __name__ == "__main__":
