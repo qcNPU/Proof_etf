@@ -178,6 +178,94 @@ def visualize_combined(embeddings, labels, titles):
                     va='top',
                     fontsize=28,
                     fontweight='bold')
+    # ===================== 添加连接线 =====================
+    from matplotlib.patches import ConnectionPatch
+
+    # 左图连接参数
+    left_box = VisualConfig.zoom_boxes['left']
+    conn_params_left = {
+        "linestyle": ":",  # 虚线样式
+        "linewidth": 3.5,  # 线宽
+        "color": "dimgray",  # 高级灰
+        "arrowstyle": "->,head_width=0.4,head_length=0.8",  # 箭头样式
+        "mutation_scale": 20  # 箭头大小
+    }
+
+    # 绘制左图两条连接线
+    for x_pos in [left_box[0], left_box[2]]:  # 左框的左右x坐标
+        connection = ConnectionPatch(
+            xyA=(x_pos, left_box[1]),  # 原图聚焦框下边缘
+            xyB=(x_pos, left_box[3]),  # 放大图上边缘
+            coordsA=axs[0, 0].transData,  # 原图坐标系
+            coordsB=axs[1, 0].transData,  # 放大图坐标系
+         ** conn_params_left
+        )
+        fig.add_artist(connection)
+
+    # 右图连接参数
+    right_box = VisualConfig.zoom_boxes['right']
+    conn_params_right = conn_params_left.copy()
+    conn_params_right.update({"color": "dimgray"})  # 右图使用不同颜色
+
+    # 绘制右图两条连接线
+    for x_pos in [right_box[0], right_box[2]]:  # 右框的左右x坐标
+        connection = ConnectionPatch(
+            xyA=(x_pos, right_box[1]),  # 原图聚焦框下边缘
+            xyB=(x_pos, right_box[3]),  # 放大图上边缘
+            coordsA=axs[0, 1].transData,
+            coordsB=axs[1, 1].transData,
+         ** conn_params_right
+        )
+        fig.add_artist(connection)
+
+    # ===================== 图例配置 =====================
+    legend_elements = [
+        plt.Line2D([0], [0],
+                   marker='o',
+                   color='w',
+                   label='Prototype',
+                   markerfacecolor='red',
+                   markersize=18,
+                   markeredgecolor='red',
+                   markeredgewidth=0),
+        plt.Line2D([0], [0],
+                   marker='*',
+                   color='w',
+                   label='ETF Target',
+                   markerfacecolor='black',
+                   markersize=22,
+                   markeredgewidth=0)
+    ]
+
+    # 通用图例参数
+    legend_style = {
+        "loc": 'upper left',
+        "bbox_to_anchor": (0.010, 0.990),  # 紧贴左上角 (0.5%边距)
+        "frameon": True,
+        "fancybox": False,  # 直角边框
+        "edgecolor": 'black',  # 边框颜色
+        "facecolor": 'white',  # 背景色
+        "framealpha": 1.0,  # 不透明
+        "borderpad": 0.3,  # 边框内边距
+        "borderaxespad": 0.2,  # 边框与坐标轴间距
+        "handletextpad": 0.5,  # 图标文字间距
+        "fontsize": 20,
+        "labelspacing": 0.4  # 标签间距
+    }
+
+    # 左列子图配置（仅Prototype）
+    for row in [0, 1]:
+        axs[row, 0].legend(
+            handles=[legend_elements[0]],
+         ** legend_style
+        )
+
+    # 右列子图配置（Prototype + ETF）
+    for row in [0, 1]:
+        axs[row, 1].legend(
+            handles=legend_elements,
+         ** legend_style
+        )
 
     plt.tight_layout()
     plt.savefig('/home/qc/python_tool/result/prototype_tsne.png', dpi=300, bbox_inches='tight')
