@@ -180,8 +180,8 @@ def visualize_combined(embeddings, labels, titles):
                     fontweight='bold')
 
     plt.tight_layout()
-    plt.savefig('/home/qc/python_tool/combined_visualization.png', dpi=300, bbox_inches='tight')
-    plt.savefig('/home/qc/python_tool/result/combined_visualization.pdf', format='pdf', dpi=300)
+    plt.savefig('/home/qc/python_tool/result/prototype_tsne.png', dpi=300, bbox_inches='tight')
+    plt.savefig('/home/qc/python_tool/result/prototype_tsne.pdf', format='pdf', dpi=300)
     plt.close()
 
 
