@@ -157,8 +157,8 @@ def visualize_combined(embeddings, labels, titles):
     # ===================== 统一样式与标题 =====================
     # 定义标题标签顺序
     position_labels = [
-        [('a', 'Proof'), ('b', 'Our Method')],
-        [('c', 'Proof (Zoomed)'), ('d', 'Our Method (Zoomed)')]
+        [('a', 'Baseline'), ('b', 'Our Method')],
+        [('c', 'Baseline (Zoomed)'), ('d', 'Our Method (Zoomed)')]
     ]
 
     for i in range(2):
@@ -176,7 +176,7 @@ def visualize_combined(embeddings, labels, titles):
                     transform=ax.transAxes,
                     ha='center',
                     va='top',
-                    fontsize=28,
+                    fontsize=30,
                     fontweight='bold')
     # ===================== 添加连接线 =====================
     from matplotlib.patches import ConnectionPatch
@@ -225,7 +225,7 @@ def visualize_combined(embeddings, labels, titles):
                    color='w',
                    label='Prototype',
                    markerfacecolor='red',
-                   markersize=18,
+                   markersize=22,
                    markeredgecolor='red',
                    markeredgewidth=0),
         plt.Line2D([0], [0],
@@ -233,7 +233,7 @@ def visualize_combined(embeddings, labels, titles):
                    color='w',
                    label='ETF Target',
                    markerfacecolor='black',
-                   markersize=22,
+                   markersize=25,
                    markeredgewidth=0)
     ]
 
@@ -246,11 +246,11 @@ def visualize_combined(embeddings, labels, titles):
         "edgecolor": 'black',  # 边框颜色
         "facecolor": 'white',  # 背景色
         "framealpha": 1.0,  # 不透明
-        "borderpad": 0.3,  # 边框内边距
+        "borderpad": 0.2,  # 边框内边距
         "borderaxespad": 0.2,  # 边框与坐标轴间距
-        "handletextpad": 0.5,  # 图标文字间距
-        "fontsize": 20,
-        "labelspacing": 0.4  # 标签间距
+        "handletextpad": 0.1,  # 图标文字间距
+        "labelspacing": 0.3,  # 标签间距
+        "prop": {"weight": "bold", "size": 28}  # 字体属性用prop字典
     }
 
     # 左列子图配置（仅Prototype）
@@ -287,7 +287,7 @@ def main():
     embeddings = tsne.fit_transform(combined_data)
 
     # 使用合并后的可视化函数
-    visualize_combined(embeddings, labels, titles=[('a', 'Proof'), ('b', 'Our Method')])
+    visualize_combined(embeddings, labels, titles=[('a', 'Baseline'), ('b', 'Our Method')])
 
 
 if __name__ == "__main__":
